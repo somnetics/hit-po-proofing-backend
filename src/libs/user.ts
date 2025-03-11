@@ -1,8 +1,11 @@
 // import logger
 import logger from "./logger";
 
-//  import functions
-import { createCondition, properCase } from "./functions";
+// import momment module
+import moment from "moment";
+
+// import function
+import { createCondition, properCase, randomKey, encrypt, decrypt } from "./functions";
 
 // import mysql class
 import MySQL from "./mysql";
@@ -10,131 +13,170 @@ import MySQL from "./mysql";
 // get mysql instance
 const mysql = new MySQL();
 
-// export User class
-export default class User{
-  // set table name
+// export user class
+export default class User {
+  // define tablename
   tableName: string;
-
-  // on initiate
+  // class constructor
   constructor() {
+    // set tablename
     this.tableName = "user";
   }
 
-  async save(data: any): Promise<any> {
+  /**
+   * get all saved users
+   * @param {any} options search options
+   */
+  async getUsers(options: any) {
+    // get offset
+    const offset = Number(options["page"]) || 1;
+
+    // get limit
+    const limit = Number(options["size"]) || 50;
+
+    // get order_by
+    const order_by = (options["order_by"]?.toString() || "name:asc").split(":");
+
+    // get trash state
+    const trash = options["trash"];
+
+    // get field struct
+    const struct = options["struct"]?.toString();
+
+    // delete page property
+    delete options["page"];
+
+    // delete limit property
+    delete options["size"];
+
+    // delete limit property
+    delete options["order_by"];
+
+    // delete trash property
+    delete options["trash"];
+
+    // delete struct property
+    delete options["struct"];
+
+    // let field conditions
+    const conditions: string[] = [`usr.deleted = ${trash == "true" ? 1 : 0}`, 'usr.is_super_user = 0'];
+
     try {
-        if (typeof data === "undefined") {
-          throw new Error("Invalid or empty data!");
-        }
-
-        if (typeof data.id === "undefined") {
-          const row: any = {
-            userName: data.userName,
-            fullName:data.fullName,
-            // lastlogin: data.lastlogin,
-            password: data.password
-          };
-
-          const user = await mysql.table(this.tableName);
-
-          await mysql
-            .into(this.tableName)
-            .fields(Object.keys(row))
-            .values(Object.values(row))
-            .insert();
-
-          return { message: "User created successfully.", status: "success" };
-        } else {
-          const row: any = {
-            id: data.id,
-            userName: data.userName,
-            fullName:data.fullName,
-            // lastlogin: data.lastlogin,
-            password: data.password
-          };
-
-          const user = await mysql.table(this.tableName);
-
-          const { exists: isUserExists } = await user.exists(row.id);
-
-          if (isUserExists) {
-            await mysql
-              .table(this.tableName)
-              .fields(Object.keys(row))
-              .values(Object.values(row))
-              .where(`id = '${row.id}'`)
-              .update();
-
-              return { message: "User updated successfully.", status: "success" };
-            } else {
-              return { message: "User not available with this id.", status: "success" };
-          }
-        }
-      } catch (e: any) {
-        console.log(e);
-        
-      // on error
-      logger(`[error]: ${e.message}`);
-
-      // response json data
-      return { message: e.message, status: "error" };
-    }
-  }
-
-  // 
-  async get(id: string): Promise<any> {
-    try {
-      if (typeof id !== "undefined") {
-
-        const user = await mysql.table(this.tableName);
-
-        const { exists: isUserExists } = await user.exists(id);
-        console.log(id, isUserExists);
-        
-        if (isUserExists) {
-          const user = await mysql
-            .table(this.tableName)
-            .where(`id = '${id}'`);
-          console.log(user);
-            return { message: "User data received successfully.", status: "success" };
-          } else {
-            return { message: "User not available with this id.", status: "success" };
+      // if struct is defined
+      if (typeof struct !== "undefined") {
+        // get conditions
+        createCondition(conditions, options, struct);
+      } else {
+        // loop fields value
+        for (const [key, value] of Object.entries(options)) {
+          // add field condition
+          conditions.push(`${key} = '${value}'`);
         }
       }
-      }catch (err: any) {
-      // on error
-      console.error("Error fetching order:", err.message);
 
-      // return data
-      return { message: err.message, status: "error" };
+      // get json data
+      const { results, total } = await mysql
+        .table("user usr LEFT JOIN role rol ON rol.id = usr.role")
+        .select("usr.*, rol.rolename")
+        .where(conditions.join(" AND "))
+        .offset(offset)
+        .limit(limit)
+        .sort(order_by[0] as string, order_by[1] as string)
+        .many();
+
+      // return json data
+      return { results: results, total: total, message: "Search done!", status: "success" };
+    } catch (err: any) {
+      // on error
+      console.error(err.message);
+
+      // return json data
+      return { results: [], total: 0, message: err.message, status: "error" };
     }
   }
 
+  /**
+   * get the user info for given user id
+   * @param {string} id of the user to be searched
+   */
+  async getUserById(id: String) {
+    try {
+      // if id is supplied
+      if (typeof id !== "undefined") {
+        // get user
+        const { result, total } = await mysql
+          .from(this.tableName)
+          .where(`id = '${id}'`)
+          .one();
 
+        // check user exists
+        if (total) {
+          // return results
+          return { result: result, total: total, status: "success" };
+        } else {
+          // return results
+          return { result: "User does not exists", total: 0, status: "error" };
+        }
+      } else {
+        // set response
+        return { result: "User Id cannot be empty", total: 0, status: "error" };
+      }
+    } catch (err: any) {
+      // on error
+      console.error(err.message);
 
-  // async get(id: string): Promise<any> {
-  //   try {
-  //     if (!id) {
-  //       throw new Error("Invalid ID!");
-  //     }
-  
-  //     const user = await mysql
-  // .table(this.tableName)
-  // .select("fullName")
-  // .where(`id = '${id}'`);
-  
-  //     if (user.length > 0) {
-  //       return { 
-  //         message: `User data received successfully: '${user[0].fullName}'.`, 
-  //         fullName: user[0].fullName, 
-  //         status: "success" 
-  //       };
-  //     } else {
-  //       return { message: "User not available with this ID.", status: "error" };
-  //     }
-  //   } catch (err: any) {
-  //     console.error("Error fetching user:", err.message);
-  //     return { message: err.message, status: "error" };
-  //   }
-  // }
-  
+      // response json data
+      return { result: err.message, total: 0, status: "error" };
+    }
+  }
+
+  /**
+   * check existance of a user by mysql query
+   * @param {string} query query of the user
+   */
+  async userExistsByQuery(query: String) {
+    try {
+      // get Service 
+      const { result, total } = await mysql
+        .from(this.tableName)
+        .where(query as string)
+        .one();
+
+      // return results
+      return { result: result, exists: total ? true : false, status: "success" }
+    } catch (err: any) {
+      // on error
+      console.error(err.message);
+
+      // return results
+      return { result: err.message, status: "error" };
+    }
+  }
+
+  /**
+   * check suggestion of a user by mysql query
+   * @param {string} fullname search query
+   */
+  async getUserSuggestion(fullname: string) {
+    try {
+      // get json data
+      const { results, total, query } = await mysql
+        .table(this.tableName)
+        .select("id, fullname, email")
+        .where(`(fullname LIKE '%${fullname}%' OR email LIKE '%${fullname}%') AND deleted = 0`)
+        .offset(0)
+        .limit(10)
+        .sort("fullname asc,", "email asc")
+        .many();
+
+      // return results
+      return { results: results, total: total }
+    } catch (err: any) {
+      // on error
+      console.error(err.message);
+
+      // response json data
+      return { results: [], total: 0 };
+    }
+  }
 }

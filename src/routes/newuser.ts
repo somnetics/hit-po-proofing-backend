@@ -17,6 +17,15 @@ router.post("/save", async (req: Request, res: Response) => {
   res.json(response);
 });
 
+//define auth route
+router.get("/auth", async (req: Request, res: Response) => {
+  // save user data
+  const response = await user. auth(req.body);
+
+  // return json response
+  res.json(response);
+});
+
 // define get by id route
 router.get("/:id", async (req: Request, res: Response) => {
   // let response

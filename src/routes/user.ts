@@ -9,13 +9,18 @@ const router = express.Router();
 
 // import mysql class
 import MySQL from "../libs/mysql";
-import { randomUUID } from "crypto";
 
 // get mysql instance
 const mysql = new MySQL();
 
 // set table name
 const tableName = "user";
+
+// import user class
+import User from "../libs/user";
+
+// init user class object
+const user = new User();
 
 // define search route
 router.get("/search", async (req: Request, res: Response) => {
@@ -26,7 +31,7 @@ router.get("/search", async (req: Request, res: Response) => {
   const limit = Number(req.query["size"]) || 50;
 
   // get order_by
-  const order_by = (req.query["order_by"]?.toString() || "name:asc").split(":");
+  const order_by = (req.query["order_by"]?.toString() || "usr.fullname:asc").split(":");
 
   // get trash state
   const trash = req.query["trash"];
@@ -66,7 +71,7 @@ router.get("/search", async (req: Request, res: Response) => {
     }
 
     // get json data
-    const data = await mysql
+    const { results, total } = await mysql
       .table("user usr LEFT JOIN role rol ON rol.id = usr.role")
       .select("usr.*, rol.rolename")
       .where(conditions.join(" AND "))
@@ -76,13 +81,33 @@ router.get("/search", async (req: Request, res: Response) => {
       .many();
 
     // response json data
-    res.json(data);
+    res.json({ results: results, total: total });
   } catch (err: any) {
     // on error
     console.error(err.message);
 
     // response json data
     res.json({ results: [], total: 0, message: err.message, status: "error" });
+  }
+});
+
+// define suggestion route
+router.get("/suggestion", async (req: Request, res: Response) => {
+  try {
+    // get fullname
+    const fullname = req.query["fullname"]?.toString() || "";
+
+    // create project
+    const { results, total } = await user.getUserSuggestion(fullname)
+
+    // response json data
+    res.json({ results: results, total: total });
+  } catch (err: any) {
+    // on error
+    console.error(err.message);
+
+    // response json data
+    res.json({ message: err.message, id: undefined, status: "error" });
   }
 });
 
@@ -96,9 +121,7 @@ router.post("/auth", async (req: Request, res: Response) => {
     const { result, total } = await mysql
       .table("user usr LEFT JOIN role rol ON rol.id = usr.role")
       .select("usr.*, rol.rolename, rol.privileges")
-      .where(
-        `(username = '${req.body.username}' OR email = '${req.body.username}')`
-      )
+      .where(`(username = '${req.body.username}' OR email = '${req.body.username}')`)
       .one();
 
     // if user exists
@@ -152,7 +175,7 @@ router.post("/", async (req: Request, res: Response) => {
 
   try {
     // generate uuid
-    const id = randomUUID();
+    const id = mysql.uuid();
 
     // get data
     const data = {
@@ -454,6 +477,5 @@ router.put("/update-password/:id", async (req: Request, res: Response) => {
   // response json
   res.json(response);
 });
-
 
 export default router;

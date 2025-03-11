@@ -38,8 +38,11 @@ const port = Number(process.env["PORT"]);
 // import logger
 import logger from "./libs/logger";
 
+// import user router module
+import user from "./routes/user";
+
 // use user router module
-// app.use("/user", user);
+app.use("/user", user);
 
 // import role router module
 import role from "./routes/role";
@@ -58,12 +61,6 @@ import fields from "./routes/fields";
 
 // use order router module
 app.use("/fields", fields);
-
-// import order router module
-import newuser from "./routes/newuser";
-
-// use order router module
-app.use("/newuser", newuser);
 
 // import order router module
 import issues from "./routes/issues";

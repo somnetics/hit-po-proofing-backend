@@ -26,42 +26,44 @@ export default class Operator {
         throw new Error("Invalid or empty data!");
       }
 
+      // create row
       const row = {
-        fullName: properCase(data.fullName.replace(/\s+/g," ").trim())
+        fullName: properCase(data.fullName.replace(/\s+/g, " ").trim())
       };
 
       const { result, total } = await mysql
         .table(this.tableName)
-        .select("*")
+        .select("id")
         .where(`fullName = '${row.fullName}'`)
         .one();
 
+      // if order exists and order_id present
       if (total > 0) {
-        if (result) {
-          await mysql
-            .table(this.tableName)
-            .fields(Object.keys(row))
-            .values(Object.values(row))
-            .where(`id = '${result.id}'`)
-            .update();
+        await mysql
+          .table(this.tableName)
+          .fields(Object.keys(row))
+          .values(Object.values(row))
+          .where(`id = '${result.id}'`)
+          .update();
 
-          return {
-            message: "operator updated successfully.",
-            status: "success"
-          };
-        }
+        // on error
+        return { message: "Operator updated successfully.", status: "success" };
+      } else {
+        // Insert a new if fullName exists
+        await mysql
+          .into(this.tableName)
+          .fields(Object.keys(row))
+          .values(Object.values(row))
+          .insert();
+
+        // response json data
+        return { message: "Operator added successfully.", status: "success" };
       }
-
-      // Insert a new if fullName exists
-      await mysql
-        .into(this.tableName)
-        .fields(Object.keys(row))
-        .values(Object.values(row))
-        .insert();
-      return { message: "operator saved successfully.", status: "success" };
     } catch (error: any) {
-      console.error(error);
+      // on error
       logger(`[error]: ${error.message}`);
+
+      // response json data
       return { message: error.message, status: "error" };
     }
   }
@@ -75,9 +77,7 @@ export default class Operator {
     const limit = Number(options["size"]) || 50;
 
     // get order_by
-    const order_by = (options["order_by"]?.toString() || "ord.id:asc").split(
-      ":"
-    );
+    const order_by = (options["order_by"]?.toString() || "ord.id:asc").split(":");
 
     // get trash state
     const trash = options["trash"];
@@ -99,6 +99,7 @@ export default class Operator {
 
     // delete struct property
     delete options["struct"];
+
     const conditions: string[] = [];
 
     try {
@@ -106,16 +107,10 @@ export default class Operator {
       if (typeof struct !== "undefined") {
         // get conditions
         createCondition(conditions, options, struct);
-      } else {
-        // add field conditions for name, url and stack
-        // if (typeof name !== "undefined") conditions.push(`(ord.name LIKE '%${name}%')`);
       }
 
-      
-
       const { results, total } = await mysql
-        .from(`${this.tableName} ord`)
-        // .select("frm.*, usr.fullname")
+        .from(`${this.tableName} ord`)        
         .where(conditions.join(" AND "))
         .offset(offset)
         .limit(limit)

@@ -16,6 +16,46 @@ export function decrypt(ciphertext: string, secret: string): string {
   return bytes.toString(CryptoJS.enc.Utf8);
 }
 
+// export generate random id
+export function randomId(length = 5) {
+  let result = "";
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const charactersLength = characters.length;
+  let counter = 0;
+  while (counter < length) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    counter += 1;
+  }
+  return result;
+}
+
+// export generate random key
+export function randomKey() {
+  const letters = 'abcdefghijklmnopqrstuvwxyz';
+  const numbers = '0123456789';
+  let result = [];
+
+  // Ensure at least 3 numbers
+  for (let i = 0; i < 3; i++) {
+    result.push(numbers[Math.floor(Math.random() * numbers.length)]);
+  }
+
+  // Fill the remaining characters with letters
+  while (result.length < 7) {
+    result.push(letters[Math.floor(Math.random() * letters.length)]);
+  }
+
+  // Shuffle the result array to mix numbers and letters
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+
+  // return result
+  return result.join('');
+}
+
 // import fs
 import fs from "fs";
 
@@ -46,20 +86,6 @@ export function removeWhiteSpace(text: string): string {
   });
 
   return result.charAt(0).toUpperCase() + result.substring(1);
-}
-
-// export generate random id
-export function randomId(length = 5) {
-  let result = "";
-  const characters =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  const charactersLength = characters.length;
-  let counter = 0;
-  while (counter < length) {
-    result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    counter += 1;
-  }
-  return result;
 }
 
 // export create condition

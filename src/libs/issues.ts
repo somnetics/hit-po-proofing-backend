@@ -45,22 +45,17 @@ export default class issues {
         .table(this.tableName)
         .where(`poNumber = '${data.poNumber}'`)
         .one();
-      // console.log(result);
 
       if (total === 0) {
-        const insertQuery = `INSERT INTO ${this.tableName} (${Object.keys(
-          row
-        ).join(", ")}) 
-        VALUES (${Object.values(row)
-            .map((v) => `'${v}'`)
-            .join(", ")})`;
-        console.log(`[Executing Query]: ${insertQuery}`);
         // Insert new issue
         await mysql
           .into(this.tableName)
           .fields(Object.keys(row))
           .values(Object.values(row))
           .insert();
+
+        // response json data
+        return { message: "Issue logged successfully.", status: "success" };
       } else {
         // Update existing issue
         await mysql
@@ -69,12 +64,16 @@ export default class issues {
           .values(Object.values(row))
           .where(`id = '${result.id}'`)
           .update();
-      }
 
-      return { message: "Issue saved successfully.", status: "success" };
-    } catch (e: any) {
-      logger(`[error]: ${e.message}`);
-      return { message: e.message, status: "error" };
+        // response json data
+        return { message: "Issue updated successfully.", status: "success" };
+      }
+    } catch (err: any) {
+      // on error
+      logger(`[error]: ${err.message}`);
+
+      // response json data
+      return { message: err.message, status: "error" };
     }
   }
 
@@ -101,7 +100,10 @@ export default class issues {
         status: "success"
       };
     } catch (err: any) {
-      console.error("Error fetching order:", err.message);
+      // on error
+      logger(`[error]: ${err.message}`);
+
+      // response json data
       return { message: err.message, status: "error" };
     }
   }
@@ -138,59 +140,20 @@ export default class issues {
     // delete struct property
     delete options["struct"];
 
-    // // get field range
-    // const range = options["range"]?.toString();
-
-    // // delete range property
-    // delete options["range"];
-
-    // // get field name
-    // const name = options["name"]?.toString();
-
-    // // delete name property
-    // delete options["name"];
-
-    // // get field modified_by
-    // const modified_by = options["modified_by"]?.toString();
-
-    // // delete modified_by property
-    // delete options["modified_by"];
-
-    // // get field version
-    // const version = options["version"]?.toString();
-
-    // // delete version property
-    // delete options["version"];
+    console.log(options);
 
     // let field conditions
-    // const conditions: string[] = [`ord.deleted = ${trash == "true" ? 1 : `0 AND frm.current = 1`}`];
-    const conditions: string[] = [];
+    const conditions: string[] = [`isu.assignTo = '${options["assignTo"]}'`];
 
     try {
       // if struct is defined
       if (typeof struct !== "undefined") {
         // get conditions
         createCondition(conditions, options, struct);
-      } else {
-        // add field conditions for name, url and stack
-        // if (typeof name !== "undefined") conditions.push(`(ord.name LIKE '%${name}%')`);
-      }
-
-      // modified_by search
-      // if (typeof modified_by !== "undefined") {
-      //   // push stack condition
-      //   if (modified_by.trim() !== "") conditions.push(`frm.modified_by = '${modified_by}'`);
-      // }
-
-      // // version search
-      // if (typeof version !== "undefined") {
-      //   // push version condition
-      //   if (version.trim() !== "") conditions.push(`frm.version = '${properCase(version)}'`);
-      // }
+      }   
 
       const { results, total } = await mysql
-        .from(`${this.tableName} ord`)
-        // .select("frm.*, usr.fullname")
+        .from(`${this.tableName} isu`)
         .where(conditions.join(" AND "))
         .offset(offset)
         .limit(limit)
