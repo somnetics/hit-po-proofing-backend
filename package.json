@@ -4,7 +4,7 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "dev": "npx nodemon --ignore ./locales ./src/main.ts",
+    "dev": "nodemon --watch src --ext ts,js --exec ts-node ./src/main.ts",
     "build": "npm run clean && tsc --removeComments",
     "clean": "rimraf ./build",
     "start": "node ./build/main.js"

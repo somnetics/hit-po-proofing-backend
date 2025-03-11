@@ -1,29 +1,27 @@
-// import express
 import express, { Request, Response } from "express";
 
 // init express router
 const router = express.Router();
 
-// import order class
-import Order from "../libs/order";
+import Operator from "../libs/operator";
 
-// init order class
-const order = new Order();
+// init operator class
+const operator = new Operator();
 
-// define save route
+//define save route
 router.post("/save", async (req: Request, res: Response) => {
-  // save order data
-  const response = await order.save(req.body);
+  // save operator data
+  const response = await operator.save(req.body);
 
   // return json response
   res.json(response);
 });
 
-// define search route
+// define get by id route
 router.get("/search", async (req: Request, res: Response) => {
   try {
     // search forms
-    const { results, total, message, status } = await order.search(req.query);
+    const { results, total, message, status } = await operator.search(req.query);
 
     // response json data
     res.json({
@@ -41,17 +39,6 @@ router.get("/search", async (req: Request, res: Response) => {
   }
 });
 
-// define get by id route
-router.get("/:id", async (req: Request, res: Response) => {
-  // let response
-  let response = {};
-
-  // get response
-  response = await order.get(req.params["id"] ?? "");
-
-  // return response
-  res.json(response);
-});
 
 // export route
 export default router;
