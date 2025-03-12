@@ -19,6 +19,15 @@ router.post("/save", async (req: Request, res: Response) => {
   res.json(response);
 });
 
+// define update route
+router.post("/update", async (req: Request, res: Response) => {
+  // update order data
+  const response = await issues.update(req.body);
+
+  // return json response
+  res.json(response);
+});
+
 // define get by id route
 router.get("/search", async (req: Request, res: Response) => {
   try {
@@ -43,20 +52,23 @@ router.get("/search", async (req: Request, res: Response) => {
 
 // define suggestion route
 router.get("/suggestion", async (req: Request, res: Response) => {
-  // get field struct
-  const remarks = req.query["remarks"]?.toString();
+  // get field   
+  const field = Object.keys(req.query)[0]?.toString();
 
-  // getSuggestions 
-  const response = await issues.getSuggestions(remarks);
+  // get value 
+  const value = Object.values(req.query)[0]?.toString();
 
+  // getSuggestions
+  const response = await issues.getSuggestions(field ?? "", value ?? "");
+  
   // return json response
   res.json(response);
 });
 
 // define get by id route
-router.get("/:poNumber", async (req: Request, res: Response) => {
+router.get("/:id", async (req: Request, res: Response) => {
   // get response
-  const response = await issues.get(req.params["poNumber"] ?? "");
+  const response = await issues.get(req.params["id"] ?? "");
 
   // return response
   res.json(response);

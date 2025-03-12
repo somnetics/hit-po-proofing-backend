@@ -77,28 +77,68 @@ export default class issues {
     }
   }
 
-  // get data
-  async get(poNumber: string): Promise<any> {
+  async update(data: any): Promise<any> {
     try {
-      if (!poNumber || poNumber.trim() === "") {
-        throw new Error("Invalid or empty PO number");
+      // Validate input
+      if (!data) {
+        throw new Error("Invalid input data");
+      }
+
+      // Prepare the row for update
+      const row: any = {
+        id: data.label || null,
+        assignTo: data.assignTo || null,
+        status: data.status || null
+      };
+
+      // Check if the issue exists
+      const { result, total } = await mysql
+        .table(this.tableName)
+        .where(`id = '${data.label}'`)
+        .one();
+
+      if (total === 0) {
+        return { message: "Issue not found", status: "error" };
+      }
+
+      // Update the issue
+      await mysql
+        .table(this.tableName)
+        .fields(Object.keys(row))
+        .values(Object.values(row))
+        .where(`id = '${data.label}'`)
+        .update();
+
+      return { message: "Issue updated successfully", status: "success" };
+    } catch (err: any) {
+      logger(`[error]: ${err.message}`);
+      return { message: err.message, status: "error" };
+    }
+  }
+
+  // get data
+  async get(id: string): Promise<any> {
+    try {
+      if (!id || id.trim() === "") {
+        throw new Error("Invalid or empty id");
       }
 
       // Fetch the field details from the database
-      const data: any = await mysql
+      const { result, total }: any = await mysql
         .table(this.tableName)
-        .where(`poNumber = '${poNumber}'`)
+        .where(`id = '${id}'`)
         .one();
 
       // Ensure data exists
-      if (!data) {
+      if (total > 0) {
+        return {
+          result: result, // Directly return the result without extra nesting
+          total: total,
+          status: "success"
+        };
+      } else {
         return { message: "Order not found", status: "error" };
       }
-
-      return {
-        result: data, // Directly return the result without extra nesting
-        status: "success"
-      };
     } catch (err: any) {
       // on error
       logger(`[error]: ${err.message}`);
@@ -117,7 +157,9 @@ export default class issues {
     const limit = Number(options["size"]) || 50;
 
     // get order_by
-    const order_by = (options["order_by"]?.toString() || "ord.id:asc").split(":");
+    const order_by = (options["order_by"]?.toString() || "ord.id:asc").split(
+      ":"
+    );
 
     // get trash state
     const trash = options["trash"];
@@ -140,17 +182,18 @@ export default class issues {
     // delete struct property
     delete options["struct"];
 
-    console.log(options);
-
     // let field conditions
-    const conditions: string[] = [`isu.assignTo = '${options["assignTo"]}'`];
+    const conditions: string[] =
+      typeof options["assignTo"] !== "undefined"
+        ? [`isu.assignTo = '${options["assignTo"]}'`]
+        : [];
 
     try {
       // if struct is defined
       if (typeof struct !== "undefined") {
         // get conditions
         createCondition(conditions, options, struct);
-      }   
+      }
 
       const { results, total } = await mysql
         .from(`${this.tableName} isu`)
@@ -175,16 +218,16 @@ export default class issues {
     }
   }
 
-  async getSuggestions(remarks: string | undefined): Promise<any> {
+  async getSuggestions(field: string, value: string): Promise<any> {
     try {
       // get json data
       const { results, total } = await mysql
         .table(this.tableName)
-        .select("distinct remarks")
-        .where(`remarks LIKE '%${remarks}%'`)
+        .select(`distinct ${field}`)
+        .where(`${field} LIKE '%${value}%'`)
         .offset(0)
         .limit(20)
-        .sort("remarks", "asc")
+        .sort(field, "asc")
         .many();
 
       // return data

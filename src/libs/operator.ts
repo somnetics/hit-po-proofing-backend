@@ -77,7 +77,7 @@ export default class Operator {
     const limit = Number(options["size"]) || 50;
 
     // get order_by
-    const order_by = (options["order_by"]?.toString() || "ord.id:asc").split(":");
+    const order_by = (options["order_by"]?.toString() || "ord.fullname:asc").split(":");
 
     // get trash state
     const trash = options["trash"];
