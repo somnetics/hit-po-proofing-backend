@@ -47,16 +47,16 @@ export default class Order {
       // console.log(bobImage);
 
       // save the base64 travelerDocument file stream to the bucket
-      const htmlContent = typeof data.travelerDocument === "object"
-         ? JSON.stringify(data.travelerDocument) // Convert object to string
-         : String(data.travelerDocument);        // Ensure it's a string
+      // const htmlContent = typeof data.travelerDocument === "object"
+      //    ? JSON.stringify(data.travelerDocument) // Convert object to string
+      //    : String(data.travelerDocument);        // Ensure it's a string
 
-      const bobHtml = await s3.putFileStream(process.env["S3_BUCKET"] as string, htmlContent, `${data.orderNumber}.html`);
+      // const bobHtml = await s3.putFileStream(process.env["S3_BUCKET"] as string, htmlContent, `${data.orderNumber}.html`);
  
       // console.log(typeof bobHtml);
 
       // if object
-      if (typeof bobImage === "object" && typeof bobHtml === "object") {
+      if (typeof bobImage === "object") {
         // get row
         const row: any = {
           id: data.orderNumber,
@@ -207,4 +207,5 @@ export default class Order {
       return { message: err.message, status: "error" };
     }
   }
+
 }

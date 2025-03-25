@@ -41,16 +41,38 @@ router.get("/search", async (req: Request, res: Response) => {
   }
 });
 
+type ResultBody = {
+  [key: string]: unknown;
+}
+
+type RespResult = {
+  result: ResultBody;
+  total: number;
+  status: string;
+}
+
 // define get by id route
 router.get("/:id", async (req: Request, res: Response) => {
   // let response
-  let response = {};
+  let response = {} as RespResult;
 
   // get response
   response = await order.get(req.params["id"] ?? "");
 
-  // return response
-  res.json(response);
+  // check if format is passed
+  if (typeof req.query !== "undefined" && typeof req.query['format'] !== "undefined" && req.query['format'] == "extracted") {
+    // get data
+    const { checkList, poDocument }: any = response.result;
+
+    // return response
+    res.json({
+      document: poDocument,
+      fields: checkList.map((list: any) => ({ label: list.label, value: list.value ?? "" }))
+    });
+  } else {
+    // return response
+    res.json(response);
+  }
 });
 
 // export route
