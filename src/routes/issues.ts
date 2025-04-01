@@ -4,15 +4,15 @@ import express, { Request, Response } from "express";
 // init express router
 const router = express.Router();
 
-// import order class
+// import issue class
 import Issues from "../libs/issues";
 
-// init fields class
+// init issues class
 const issues = new Issues();
 
 // define save route
 router.post("/save", async (req: Request, res: Response) => {
-  // save order data
+  // save issue data
   const response = await issues.save(req.body);
 
   // return json response
@@ -21,7 +21,7 @@ router.post("/save", async (req: Request, res: Response) => {
 
 // define update route
 router.post("/update", async (req: Request, res: Response) => {
-  // update order data
+  // update issue data
   const response = await issues.update(req.body);
 
   // return json response

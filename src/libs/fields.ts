@@ -38,16 +38,16 @@ export default class fields {
         .where(`label = '${data.label}'`)
         .one();
 
-      // if order exists
+      // if fields not exists
       if (total == 0) {
-        // update order
+        // create fields
         await mysql
           .into(this.tableName)
           .fields(Object.keys(row))
           .values(Object.values(row))
           .insert();
       } else {
-        // create order
+        // update fields
         await mysql
           .table(this.tableName)
           .fields(Object.keys(row))
@@ -76,7 +76,6 @@ export default class fields {
           .table(this.tableName)
           .where(`label = '${label}'`)
           .one();
-
         // return data
         return {
           result: result,
@@ -85,11 +84,11 @@ export default class fields {
         };
       } else {
         // return data
-        return { message: "Order not found", status: "error" };
+        return { message: "Fields not found", status: "error" };
       }
     } catch (err: any) {
       // on error
-      console.error("Error fetching order:", err.message);
+      console.error("Error fetching Fields:", err.message);
 
       // return data
       return { message: err.message, status: "error" };
@@ -113,7 +112,7 @@ export default class fields {
       };
     } catch (err: any) {
       // on error
-      console.error("Error fetching order:", err.message);
+      console.error("Error fetching Fields:", err.message);
 
       // return data
       return { message: err.message, status: "error" };

@@ -44,17 +44,7 @@ export default class Order {
 
       // save the base64 image file stream to the bucket
       const bobImage = await s3.putFileStream(process.env["S3_BUCKET"] as string, data.poDocument, `${data.orderNumber}.png`);
-      // console.log(bobImage);
-
-      // save the base64 travelerDocument file stream to the bucket
-      // const htmlContent = typeof data.travelerDocument === "object"
-      //    ? JSON.stringify(data.travelerDocument) // Convert object to string
-      //    : String(data.travelerDocument);        // Ensure it's a string
-
-      // const bobHtml = await s3.putFileStream(process.env["S3_BUCKET"] as string, htmlContent, `${data.orderNumber}.html`);
- 
-      // console.log(typeof bobHtml);
-
+      
       // if object
       if (typeof bobImage === "object") {
         // get row
