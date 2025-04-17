@@ -41,6 +41,34 @@ router.get("/search", async (req: Request, res: Response) => {
   }
 });
 
+// Define a GET route for downloading Excel data
+router.get("/download", async (req: Request, res: Response): Promise<void> => {
+  try {
+    // 1. Call the download function with the query parameters from the request
+    const { buffer, fileName, status, message } = await order.download(req.query);
+
+    // 2. Log message if any (e.g., "No data found")
+    if (message) console.log("Message:", message);
+
+    // 3. If download failed, send error response
+    if (status === "error") {
+      res.status(500).json({ message, status });
+      return;
+    }
+
+    // 4. Set response headers for file download
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`); // Suggests a file name to the client
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); // MIME type for Excel file
+
+    // 5. Send the Excel file buffer as the response
+    res.end(buffer);
+  } catch (err: any) {
+    // 6. Catch and handle any unexpected errors
+    console.error("Download Error:", err.message);
+    res.status(500).json({ message: err.message, status: "error" });
+  }
+});
+
 type ResultBody = {
   [key: string]: unknown;
 }

@@ -1,5 +1,6 @@
 // import dotenv
 import dotenv from "dotenv";
+import cors from "cors";
 
 // import bodyParser
 // import { json, urlencoded } from 'body-parser';
@@ -23,6 +24,12 @@ app.use(
     extended: true
   })
 );
+
+app.use(cors({
+  origin: "*", 
+  methods: ["GET"],
+  exposedHeaders: ["Content-Disposition"]
+}));
 
 // Increase URL-encoded payload limit
 const bodyParser = require("body-parser");

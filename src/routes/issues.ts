@@ -50,6 +50,38 @@ router.get("/search", async (req: Request, res: Response) => {
   }
 });
 
+// Route to download issue data as an Excel file
+router.get("/download", async (req: Request, res: Response): Promise<void> => {
+  try {
+    // 1. Call the download method from the issues service with query parameters
+    const { buffer, fileName, status, message } = await issues.download(req.query);
+
+    // 2. Log any informational message (e.g., "No data found")
+    if (message) console.log("Message:", message);
+
+    // 3. If an error occurred, respond with a 500 error and the message
+    if (status === "error") {
+      res.status(500).json({ message, status });
+      return;
+    }
+
+    // 4. Set headers to prompt the browser to download the Excel file
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`); // Sets the downloaded file name
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ); // Sets correct MIME type for .xlsx files
+
+    // 5. Send the Excel buffer as the file content
+    res.end(buffer);
+  } catch (err: any) {
+    // 6. Handle any unexpected errors during the download process
+    console.error("Download Error:", err.message);
+    res.status(500).json({ message: err.message, status: "error" });
+  }
+});
+
+
 // define suggestion route
 router.get("/suggestion", async (req: Request, res: Response) => {
   // get field   
@@ -63,6 +95,17 @@ router.get("/suggestion", async (req: Request, res: Response) => {
   
   // return json response
   res.json(response);
+});
+
+// fetch assignto and username
+router.get("/assigned-users", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const data = await issues.getAssignedUsers();
+    res.status(200).json({ status: "success", data });
+  } catch (err: any) {
+    console.error("Error fetching assigned users:", err.message);
+    res.status(500).json({ status: "error", message: err.message });
+  }
 });
 
 // define get by id route
