@@ -65,6 +65,7 @@ export default class issues {
         return { message: "Issue logged successfully.", status: "success" };
       } else {
         // Update existing issue
+        console.log(result.id);
         await mysql
           .table(this.tableName)
           .fields(Object.keys(row))
@@ -141,7 +142,7 @@ export default class issues {
       // Ensure data exists
       if (total > 0) {
         return {
-          result: result, // Directly return the result without extra nesting
+          result: result,
           total: total,
           status: "success"
         };
@@ -256,26 +257,31 @@ export default class issues {
   // download data as Excel
   async download(options: any): Promise<any> {
     try {
+      // Extract pagination and sorting parameters
       const offset = Number(options["page"]) || 1;
       const limit = Number(options["size"]) || 50;
       const order_by = (options["order_by"]?.toString() || "ord.id:asc").split(":");
       const struct = options["struct"]?.toString();
   
+      // Remove used keys to prevent them from affecting condition generation
       delete options["page"];
       delete options["size"];
       delete options["order_by"];
       delete options["trash"];
       delete options["struct"];
   
+      // Build SQL WHERE conditions
       const conditions: string[] =
         typeof options["assignTo"] !== "undefined"
           ? [`isu.assignTo LIKE '%${options["assignTo"]}%'`]
           : [];
   
+      // Generate dynamic condition if struct is provided
       if (typeof struct !== "undefined") {
         createCondition(conditions, options, struct);
       }
   
+      // Define allowed columns to be selected
       const allowedKeys = [
         "id",
         "assignTo",
@@ -291,6 +297,7 @@ export default class issues {
         "status"
       ];
   
+      // Fetch filtered results from database
       const { results, total } = await mysql
         .select(allowedKeys.map((key) => `isu.${key}`))
         .from(`${this.tableName} isu`)
@@ -300,10 +307,12 @@ export default class issues {
         .sort(order_by[0] as string, order_by[1] as string)
         .many();
   
+      // Initialize Excel workbook and sheet
       const ExcelJS = require("exceljs");
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Issues");
   
+      // If no results found, return early
       if (!results || results.length === 0) {
         return {
           message: "No data found",
@@ -313,6 +322,7 @@ export default class issues {
         };
       }
   
+      // Define headers for Excel sheet
       const headerMap: Record<string, string> = {
         id: "Id",
         assignTo: "Assign To",
@@ -328,18 +338,21 @@ export default class issues {
         status: "Status"
       };
   
+      // Set up worksheet columns using allowed keys and headers
       worksheet.columns = allowedKeys.map((key) => ({
         header: headerMap[key] || key,
         key: key,
         width: 20
       }));
   
+      // Populate worksheet rows and apply coloring
       results.forEach((row: any) => {
         const excelRow = worksheet.addRow(row);
   
         const rowColor = (row.color || "").toLowerCase();
         const remarksColor = (row.remarks_color || "").toLowerCase();
   
+        // Helper function to fill the entire row with color
         const fullRowFill = (argbColor: string) => {
           excelRow.eachCell((cell: any) => {
             cell.fill = {
@@ -351,11 +364,13 @@ export default class issues {
           });
         };
   
-        if (rowColor === "green") {
-          fullRowFill("FF00FF00");
+        // Apply color based on row.color
+        if (rowColor === "green" || row.completed === 1) {
+          fullRowFill("FF00FF00"); // Light green
         } else if (rowColor === "blue") {
-          fullRowFill("FF7DF9FF");
+          fullRowFill("FF7DF9FF"); // Light blue
         } else if (rowColor === "yellow") {
+          // Only color 'status' and 'email' 
           ["status", "email"].forEach((key) => {
             const colIndex = worksheet.columns.findIndex(
               (col: ExcelJS.Column) => col.key === key
@@ -372,6 +387,7 @@ export default class issues {
           });
         }
   
+        // Apply coloring for remarks based on remarks_color
         if (remarksColor === "red" || remarksColor === "orange") {
           const colorMap: Record<string, string> = {
             red: "FFFF0000",
@@ -387,11 +403,12 @@ export default class issues {
               pattern: "solid",
               fgColor: { argb: colorMap[remarksColor] }
             };
-            cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+            cell.font = { bold: true, color: { argb: "FFFFFFFF" } }; // White text
           }
         }
       });
   
+      // Generate Excel buffer for download
       const buffer = await workbook.xlsx.writeBuffer();
   
       return {
@@ -404,26 +421,30 @@ export default class issues {
       return { message: err.message, status: "error", results: [], total: 0 };
     }
   }
-
+  
   async getAssignedUsers() {
     try {
+      // Fetch distinct user names from the current table
       const { results: userNames } = await mysql
         .from(`${this.tableName}`)
         .select("DISTINCT userName")
         .many();
-
+  
+      // Fetch distinct full names from the 'operator' table
       const { results: fullNames } = await mysql
         .from(`operator`)
         .select("DISTINCT fullName")
         .many();
-
+  
+      // Return the list of usernames and full names as arrays
       return {
         userNames: userNames.map((r: any) => r.userName),
         fullNames: fullNames.map((r: any) => r.fullName)
       };
     } catch (err: any) {
+      // Log the error and throw a custom error message
       console.error("DB error:", err.message);
       throw new Error("Failed to fetch assigned users");
     }
-  }
+  }  
 }
