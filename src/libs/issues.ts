@@ -388,10 +388,10 @@ export default class issues {
         }
   
         // Apply coloring for remarks based on remarks_color
-        if (remarksColor === "red" || remarksColor === "orange") {
+        if (remarksColor === "red" || remarksColor === "blue") {
           const colorMap: Record<string, string> = {
             red: "FFFF0000",
-            orange: "FFFFA500"
+            blue: "FF0D6EFD"
           };
           const colIndex = worksheet.columns.findIndex(
             (col: ExcelJS.Column) => col.key === "remarks"

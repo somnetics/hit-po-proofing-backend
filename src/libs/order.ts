@@ -219,6 +219,7 @@ export default class Order {
         .limit(limit) // Limit the number of rows
         .sort(order_by[0], order_by[1]) // Sort by requested column and order
         .many(); // Fetch many results
+        // console.log(total);
 
       // 7. If no records found, return early
       if (!results || results.length === 0) {
