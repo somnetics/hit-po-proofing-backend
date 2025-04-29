@@ -23,6 +23,7 @@ router.post("/save", async (req: Request, res: Response) => {
 router.get("/search", async (req: Request, res: Response) => {
   try {
     // search forms
+    // console.log(req.query);
     const { results, total, message, status } = await order.search(req.query);
 
     // response json data

@@ -42,7 +42,7 @@ export default class issues {
         problemDetails: data.problemDetails || null,
         problemOccourIn: data.problemOccourIn || null,
         shipDate: data.shipDate.trim() != "" ? data.shipDate : "NULL",
-        email: data.email || null,
+        // email: data.email || null,
         remarks: data.remarks || null,
         remarks_color: data.remarks_color || null
       };
@@ -96,6 +96,7 @@ export default class issues {
       const row: any = {
         id: data.label || null,
         assignTo: data.assignTo || null,
+        email: data.email || null,
         status: data.status || null,
         color: data.status_color || null,
         completed: data.completed ?? 0,
