@@ -326,6 +326,49 @@ export default class Order {
     }
   }
 
+  // async reportData(options: any): Promise<any> {
+  //   const conditions: string[] = [];
+
+  //   try {
+  //     // Apply dynamic filters
+  //     if (typeof options.struct !== "undefined") {
+  //       createCondition(conditions, options, options.struct.toString());
+  //     }
+
+  //     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  //     // === Report 1: Count of completed orders per operatorName ===
+  //     const { result, total } = await mysql
+  //       .table(this.tableName)
+  //       .select("*")
+  //       .where(`id = '${id}'`)
+  //       .many();
+
+  //     // === Report 2: Count of completed orders per day (createdOn) ===
+  //     const byDate = await mysql.query(
+  //       `SELECT DATE(ord.createdOn) AS orderDate, COUNT(*) AS orderCount
+  //      FROM ${this.tableName} ord
+  //      ${whereClause}
+  //      GROUP BY DATE(ord.createdOn)
+  //      ORDER BY orderDate ASC`
+  //     );
+
+  //     return {
+  //       status: "success",
+  //       data: {
+  //         byOperator,
+  //         byDate
+  //       }
+  //     };
+  //   } catch (error: any) {
+  //     logger(`[error]: ${error.message}`);
+  //     return {
+  //       status: "error",
+  //       message: error.message
+  //     };
+  //   }
+  // }
+
   // download data as Excel
   async download(options: any): Promise<any> {
     try {
