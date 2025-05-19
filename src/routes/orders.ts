@@ -19,6 +19,22 @@ router.post("/save", async (req: Request, res: Response) => {
   res.json(response);
 });
 
+router.post("/checkbox-toggle-all", async (req: Request, res: Response) => {
+  // checkboxToggleAll order data
+  const response = await order.checkboxToggleAll(req.body);
+
+  // return json response
+  res.json(response);
+});
+
+router.post("/checkbox-modified-time", async (req: Request, res: Response) => {
+  // checkboxToggleAll order data
+  const response = await order.upsertOrder(req.body);
+
+  // return json response
+  res.json(response);
+});
+
 // define search route
 router.get("/search", async (req: Request, res: Response) => {
   try {
@@ -69,6 +85,31 @@ router.get("/download", async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ message: err.message, status: "error" });
   }
 });
+// router.get("/download", async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     const { buffer, fileName, status, message } = await order.download(req.query);
+
+//     if (status === "error" || !buffer) {
+//       console.error("Download error:", message);
+//       if (!res.headersSent) {
+//         res.status(500).json({ message: message || "Download failed", status: "error" });
+//       }
+//       return;
+//     }
+
+//     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+//     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+//     res.end(buffer);
+//   } catch (err: any) {
+//     console.error("Download Error:", err.message);
+//     if (!res.headersSent) {
+//       res.status(500).json({ message: err.message, status: "error" });
+//     } else {
+//       // Optional: If headers already sent, destroy response
+//       res.destroy(); 
+//     }
+//   }
+// });
 
 type ResultBody = {
   [key: string]: unknown;

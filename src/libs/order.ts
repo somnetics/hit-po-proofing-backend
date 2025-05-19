@@ -12,6 +12,7 @@ const mysql = new MySQL();
 
 // import required modules
 import S3, { s3Options } from "./s3";
+import { log } from "console";
 
 // s3 optionjs
 const options: s3Options = {
@@ -53,16 +54,44 @@ export default class Order {
 
       // if object
       if (typeof bobImage === "object") {
+        // Parse checklist and determine if it has 'Ship To' label with MULTI-DESTINATIONS
+        let multiShip = null;
+        try {
+          const checklistArray: { label: string; value: string | string[] }[] = Array.isArray(data.checkList)
+            ? data.checkList
+            : JSON.parse(data.checkList);
+
+          const shipToEntry = checklistArray.find(
+            (item: { label: string; value: string | string[] }) =>
+              item.label === "Ship To" &&
+              typeof item.value === "string" &&
+              item.value.toLowerCase().includes("multi")
+          );
+
+          if (shipToEntry) {
+            multiShip = shipToEntry.value;
+          }
+        } catch (e) {
+          const err = e as Error;
+          logger(`[warn]: Error parsing checklist for Ship To – ${err.message}`);
+        }
+
         // get row
         const row: any = {
           id: data.orderNumber,
           travelerDocument: JSON.stringify(data.travelerDocument).replace(/'/g, "\\'").replace(/\\"/g, ""),
-          poOverlayBlocks: JSON.stringify(data.poOverlayBlocks).replace(/'/g, "\\'").replace(/\\"/g, ""),          
+          poOverlayBlocks: JSON.stringify(data.poOverlayBlocks).replace(/'/g, "\\'").replace(/\\"/g, ""),
           checkList: JSON.stringify(data.checkList).replace(/'/g, "\\'").replace(/\\"/g, ""),
           bizzRuleUrl: data.bizzRuleUrl,
           userName: data.userName,
           operatorName: data.operatorName,
-          allRects: JSON.stringify(data.allRects).replace(/'/g, "\\'").replace(/\\"/g, "")
+          allRects: JSON.stringify(data.allRects).replace(/'/g, "\\'").replace(/\\"/g, ""),
+          durationSec: data.durationSec || 0,
+          result: JSON.stringify(data.result).replace(/'/g, "\\'").replace(/\\"/g, ""),
+          // listToUse: JSON.stringify(data.listToUse).replace(/'/g, "\\'").replace(/\\"/g, ""),
+          // listToUse: listToUseJson,
+          // accuracyPercent: accuracy,
+          multiShip: multiShip,
         };
 
         // get orders
@@ -101,6 +130,131 @@ export default class Order {
 
       // response json data
       return { message: e.message, status: "error" };
+    }
+  }
+
+  async checkboxToggleAll(data: any): Promise<any> {
+    try {
+      if (!data || !data.orderNumber || !Array.isArray(data.checkedItems)) {
+        throw new Error("Invalid payload: orderNumber or checkedItems missing.");
+      }
+
+      const orderNumber = data.orderNumber;
+      const listToUse = data.checkedItems;
+      const listToUseJson = JSON.stringify(listToUse).replace(/'/g, "\\'").replace(/\\"/g, "");
+      let foundTrueCount = 0;
+      try {
+        const parsed = JSON.parse(listToUseJson);
+        if (Array.isArray(parsed)) {
+          foundTrueCount = parsed.filter((item: any) => item.found === true).length;
+        }
+      } catch (err) {
+        console.error("Failed to parse listToUseJson:", err);
+      }
+
+      // Fetch existing result from DB
+      const { results, total } = await mysql
+        .from(`${this.tableName} ord`)
+        .select("ord.result")
+        .where(`ord.id = '${orderNumber}'`)
+        .many();
+
+      let resultFoundTrueCount = 0;
+      if (results && Array.isArray(results)) {
+        try {
+          results.forEach((row: any) => {
+            const resultArray = typeof row.result === "string"
+              ? JSON.parse(row.result)
+              : row.result;
+
+            if (Array.isArray(resultArray)) {
+              resultFoundTrueCount += resultArray.filter((item: any) => item.found === true).length;
+            }
+          });
+        } catch (err) {
+          console.error("Failed to parse result column:", err);
+        }
+      }
+      // console.log("resultFoundTrueCount", resultFoundTrueCount);
+      let accuracy = 100;
+      if (resultFoundTrueCount > 0) {
+        accuracy = (foundTrueCount / resultFoundTrueCount) * 100;
+      } else {
+        accuracy = 100;
+      }
+      accuracy = parseFloat(accuracy.toFixed(2));
+      const row: any = {
+        id: orderNumber,
+        listToUse: listToUseJson,
+        accuracyPercent: accuracy,
+      };
+
+      // Step 3: Insert or update
+      const orders = await mysql.table(this.tableName).exists(orderNumber);
+
+      if (!orders.exists) {
+        await mysql
+          .into(this.tableName)
+          .fields(Object.keys(row))
+          .values(Object.values(row))
+          .insert();
+      } else {
+        await mysql
+          .table(this.tableName)
+          .fields(Object.keys(row))
+          .values(Object.values(row))
+          .where(`id = '${orderNumber}'`)
+          .update();
+      }
+
+      return { message: "Order updated successfully.", status: "success" };
+    } catch (e: any) {
+      logger(`[error]: ${e.message}`);
+      return { message: e.message, status: "error" };
+    }
+  }
+
+  async upsertOrder(data: any): Promise<any> {
+    try {
+      const row: any = {
+        id: data.orderNumber,
+        modifyOn: data.modifyOn
+      }
+      const fields = Object.keys(row);
+      const values = Object.values(row);
+
+      // console.log("Table:", this.tableName);
+      // console.log("Fields:", fields);
+      // console.log("Values:", values);
+      // Step 1: Check if order exists
+      const existing = await mysql.table(this.tableName).exists(data.orderNumber);
+
+      // Step 2: Insert or update
+      if (!existing.exists) {
+        await mysql
+          .into(this.tableName)
+          .fields(Object.keys(row))
+          .values(Object.values(row))
+          .insert();
+      } else {
+        await mysql
+          .table(this.tableName)
+          .fields(Object.keys(row))
+          .values(Object.values(row))
+          .where(`id = '${data.orderNumber}'`)
+          .update();
+      }
+
+      return {
+        message: "Order updated successfully.",
+        status: "success"
+      };
+    } catch (err: any) {
+      console.error("Upsert error:", err.message);
+      return {
+        message: err.message,
+        status: "error"
+      };
     }
   }
 
@@ -150,7 +304,7 @@ export default class Order {
 
       const { results, total } = await mysql
         .from(`${this.tableName} ord`)
-        .select("id, userName, operatorName, createdOn, modifyOn")
+        .select("id, userName, operatorName, createdOn, modifyOn, durationSec, accuracyPercent")
         .where(conditions.join(" AND "))
         .offset(offset)
         .limit(limit)
@@ -207,7 +361,9 @@ export default class Order {
         "userName",
         "operatorName",
         "createdOn",
-        "modifyOn"
+        "modifyOn",
+        "durationSec",
+        "accuracyPercent",
       ];
 
       // 6. Fetch filtered and sorted data from the MySQL database
@@ -219,7 +375,7 @@ export default class Order {
         .limit(limit) // Limit the number of rows
         .sort(order_by[0], order_by[1]) // Sort by requested column and order
         .many(); // Fetch many results
-        // console.log(total);
+      // console.log(total);
 
       // 7. If no records found, return early
       if (!results || results.length === 0) {
@@ -244,7 +400,10 @@ export default class Order {
         userName: "UserName",
         operatorName: "Operator Name",
         createdOn: "Created On",
-        modifyOn: "Modify On"
+        // modifyOn: "Modify On",
+        accuracyPercent: "Accuracy(%)",
+        durationSec: "Duration (sec)",
+        modifyOn: "Complete Order"
       };
 
       // 10. Define worksheet columns based on allowed keys and headerMap

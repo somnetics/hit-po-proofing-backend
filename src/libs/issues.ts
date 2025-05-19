@@ -39,11 +39,11 @@ export default class issues {
         poNumber: data.poNumber || null,
         soNumber: data.soNumber || null,
         userName: data.userName || null,
-        problemDetails: data.problemDetails || null,
+        problemDetails: (data.problemDetails).replace(/'/g, "\\'").replace(/\\"/g, "") || null,
         problemOccourIn: data.problemOccourIn || null,
         shipDate: data.shipDate.trim() != "" ? data.shipDate : "NULL",
         // email: data.email || null,
-        remarks: data.remarks || null,
+        remarks: data.remarks .replace(/'/g, "\\'").replace(/\\"/g, "") || null,
         remarks_color: data.remarks_color || null
       };
 
