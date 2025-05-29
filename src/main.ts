@@ -81,6 +81,13 @@ import operator from "./routes/operator";
 // use order router module
 app.use("/operator", operator);
 
+// import order router module
+import reports from "./routes/reports";
+
+// use order router module
+app.use("/reports", reports);
+
+
 // listen to server
 app.listen(port, "0.0.0.0", () => {
   logger(`[server]: Server is running at http://localhost:${port}`);

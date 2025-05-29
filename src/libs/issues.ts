@@ -43,7 +43,7 @@ export default class issues {
         problemOccourIn: data.problemOccourIn || null,
         shipDate: data.shipDate.trim() != "" ? data.shipDate : "NULL",
         // email: data.email || null,
-        remarks: data.remarks .replace(/'/g, "\\'").replace(/\\"/g, "") || null,
+        remarks: data.remarks.replace(/'/g, "\\'").replace(/\\"/g, "") || null,
         remarks_color: data.remarks_color || null
       };
 
@@ -168,15 +168,37 @@ export default class issues {
     const limit = Number(options["size"]) || 50;
 
     // get order_by
-    const order_by = (options["order_by"]?.toString() || "ord.id:asc").split(
+    const order_by = (options["order_by"]?.toString() || "isu.id:asc").split(
       ":"
     );
+
+    // console.log(options);
+
+    // get status 
+    options["color"] = (options["status"]?.toString() || "Green");
+
+    // logic replaces the status with color
+    delete options["status"];
 
     // get trash state
     const trash = options["trash"];
 
     // get field struct
-    const struct = options["struct"]?.toString();
+    let struct = options["struct"]?.toString();
+
+    struct = JSON.parse(struct);
+
+    if (typeof struct.length) {
+      const index = struct.findIndex((field: any) => field.name == "status");
+      
+      if(index > -1) {
+        struct[index].name = "color";
+      }
+    }
+
+    struct = JSON.stringify(struct);
+
+    // console.log(struct);
 
     // delete page property
     delete options["page"];
@@ -196,7 +218,7 @@ export default class issues {
     const conditions: string[] =
       typeof options["assignTo"] !== "undefined"
         ? [`isu.assignTo LIKE '%${options["assignTo"]}%'`]
-        : [];
+        : []; 
 
     try {
       // if struct is defined
@@ -204,6 +226,8 @@ export default class issues {
         // get conditions
         createCondition(conditions, options, struct);
       }
+
+      // console.log(options, conditions);
 
       const { results, total } = await mysql
         .from(`${this.tableName} isu`)
@@ -263,25 +287,25 @@ export default class issues {
       const limit = Number(options["size"]) || 50;
       const order_by = (options["order_by"]?.toString() || "ord.id:asc").split(":");
       const struct = options["struct"]?.toString();
-  
+
       // Remove used keys to prevent them from affecting condition generation
       delete options["page"];
       delete options["size"];
       delete options["order_by"];
       delete options["trash"];
       delete options["struct"];
-  
+
       // Build SQL WHERE conditions
       const conditions: string[] =
         typeof options["assignTo"] !== "undefined"
           ? [`isu.assignTo LIKE '%${options["assignTo"]}%'`]
           : [];
-  
+
       // Generate dynamic condition if struct is provided
       if (typeof struct !== "undefined") {
         createCondition(conditions, options, struct);
       }
-  
+
       // Define allowed columns to be selected
       const allowedKeys = [
         "id",
@@ -297,7 +321,7 @@ export default class issues {
         "email",
         "status"
       ];
-  
+
       // Fetch filtered results from database
       const { results, total } = await mysql
         .select(allowedKeys.map((key) => `isu.${key}`))
@@ -307,12 +331,12 @@ export default class issues {
         .limit(limit)
         .sort(order_by[0] as string, order_by[1] as string)
         .many();
-  
+
       // Initialize Excel workbook and sheet
       const ExcelJS = require("exceljs");
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Issues");
-  
+
       // If no results found, return early
       if (!results || results.length === 0) {
         return {
@@ -322,7 +346,7 @@ export default class issues {
           results: []
         };
       }
-  
+
       // Define headers for Excel sheet
       const headerMap: Record<string, string> = {
         id: "Id",
@@ -338,21 +362,21 @@ export default class issues {
         email: "Email",
         status: "Status"
       };
-  
+
       // Set up worksheet columns using allowed keys and headers
       worksheet.columns = allowedKeys.map((key) => ({
         header: headerMap[key] || key,
         key: key,
         width: 20
       }));
-  
+
       // Populate worksheet rows and apply coloring
       results.forEach((row: any) => {
         const excelRow = worksheet.addRow(row);
-  
+
         const rowColor = (row.color || "").toLowerCase();
         const remarksColor = (row.remarks_color || "").toLowerCase();
-  
+
         // Helper function to fill the entire row with color
         const fullRowFill = (argbColor: string) => {
           excelRow.eachCell((cell: any) => {
@@ -364,7 +388,7 @@ export default class issues {
             cell.font = { bold: true, color: { argb: "FF000000" } };
           });
         };
-  
+
         // Apply color based on row.color
         if (rowColor === "green" || row.completed === 1) {
           fullRowFill("FF00FF00"); // Light green
@@ -387,7 +411,7 @@ export default class issues {
             }
           });
         }
-  
+
         // Apply coloring for remarks based on remarks_color
         if (remarksColor === "red" || remarksColor === "blue") {
           const colorMap: Record<string, string> = {
@@ -408,10 +432,10 @@ export default class issues {
           }
         }
       });
-  
+
       // Generate Excel buffer for download
       const buffer = await workbook.xlsx.writeBuffer();
-  
+
       return {
         buffer,
         fileName: `issues_${Date.now()}.xlsx`,
@@ -422,7 +446,7 @@ export default class issues {
       return { message: err.message, status: "error", results: [], total: 0 };
     }
   }
-  
+
   async getAssignedUsers() {
     try {
       // Fetch distinct user names from the current table
@@ -430,13 +454,13 @@ export default class issues {
         .from(`${this.tableName}`)
         .select("DISTINCT userName")
         .many();
-  
+
       // Fetch distinct full names from the 'operator' table
       const { results: fullNames } = await mysql
         .from(`operator`)
         .select("DISTINCT fullName")
         .many();
-  
+
       // Return the list of usernames and full names as arrays
       return {
         userNames: userNames.map((r: any) => r.userName),
@@ -447,5 +471,5 @@ export default class issues {
       console.error("DB error:", err.message);
       throw new Error("Failed to fetch assigned users");
     }
-  }  
+  }
 }

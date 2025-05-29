@@ -92,6 +92,8 @@ export default class Order {
           // listToUse: listToUseJson,
           // accuracyPercent: accuracy,
           multiShip: multiShip,
+          foundFalse: data.foundFalse,
+          foundTrue: data.foundTrue,
         };
 
         // get orders
@@ -178,7 +180,10 @@ export default class Order {
       // console.log("resultFoundTrueCount", resultFoundTrueCount);
       let accuracy = 100;
       if (resultFoundTrueCount > 0) {
-        accuracy = (foundTrueCount / resultFoundTrueCount) * 100;
+        // accuracy = (foundTrueCount / resultFoundTrueCount) * 100;
+        accuracy = (resultFoundTrueCount > 0)
+          ? Math.min((foundTrueCount / resultFoundTrueCount) * 100, 100)
+          : 100;
       } else {
         accuracy = 100;
       }
@@ -214,49 +219,88 @@ export default class Order {
     }
   }
 
-  async upsertOrder(data: any): Promise<any> {
-    try {
-      const row: any = {
-        id: data.orderNumber,
-        modifyOn: data.modifyOn
-      }
-      const fields = Object.keys(row);
-      const values = Object.values(row);
+  // async upsertOrder(data: any): Promise<any> {
+  //   try {
+  //     // 1) get a JS Date
+  //     const now = new Date();
+  //     // 2) format it for MySQL
+  //     const formattedNow =
+  //       now.toISOString().slice(0, 19).replace("T", " ");
+  //     console.log(formattedNow);
 
-      // console.log("Table:", this.tableName);
-      // console.log("Fields:", fields);
-      // console.log("Values:", values);
-      // Step 1: Check if order exists
-      const existing = await mysql.table(this.tableName).exists(data.orderNumber);
+  //     // Build your row (here only id + modifyOn)
+  //     const row: any = {
+  //       id: data.orderNumber,
+  //       modifyOn: formattedNow
+  //     };
 
-      // Step 2: Insert or update
-      if (!existing.exists) {
-        await mysql
-          .into(this.tableName)
-          .fields(Object.keys(row))
-          .values(Object.values(row))
-          .insert();
-      } else {
-        await mysql
-          .table(this.tableName)
-          .fields(Object.keys(row))
-          .values(Object.values(row))
-          .where(`id = '${data.orderNumber}'`)
-          .update();
-      }
+  //     const fields = Object.keys(row);
+  //     const values = Object.values(row);
+  //     const existing = await mysql.table(this.tableName).exists(data.orderNumber);
 
-      return {
-        message: "Order updated successfully.",
-        status: "success"
-      };
-    } catch (err: any) {
-      console.error("Upsert error:", err.message);
-      return {
-        message: err.message,
-        status: "error"
-      };
+  //     if (!existing.exists) {
+  //       await mysql
+  //         .into(this.tableName)
+  //         .fields(fields)
+  //         .values(values)
+  //         .insert();
+  //     } else {
+  //       // 3) use parameter binding in the WHERE clause too
+  //       await mysql
+  //         .table(this.tableName)
+  //         .fields(fields)
+  //         .values(values)
+  //         .where(`id = '${data.orderNumber}'`)
+  //         .update();
+  //     }
+
+  //     return { message: "Order upserted successfully.", status: "success" };
+  //   } catch (err: any) {
+  //     console.error("Upsert error:", err.message);
+  //     return { message: err.message, status: "error" };
+  //   }
+  // }
+    async upsertOrder(data: any): Promise<any> {
+  try {
+    // 1) get a JS Date
+    const now = new Date();
+    // 2) format it for MySQL
+    const formattedNow =
+      now.toISOString().slice(0, 19).replace("T", " "); 
+      console.log(formattedNow);
+
+    // Build your row (here only id + modifyOn)
+    const row: any = {
+      id: data.orderNumber,
+      modifyOn: formattedNow
+    };
+
+    const fields = Object.keys(row);
+    const values = Object.values(row);
+    const existing = await mysql.table(this.tableName).exists(data.orderNumber);
+
+    if (!existing.exists) {
+      await mysql
+        .into(this.tableName)
+        .fields(fields)
+        .values(values)
+        .insert();
+    } else {
+      // 3) use parameter binding in the WHERE clause too
+      await mysql
+        .table(this.tableName)
+        .fields(fields)
+        .values(values)
+        .where(`id = '${data.orderNumber}'`)
+        .update();
     }
+
+    return { message: "Order upserted successfully.", status: "success" };
+  } catch (err: any) {
+    console.error("Upsert error:", err.message);
+    return { message: err.message, status: "error" };
   }
+}
 
   // search data
   async search(options: any): Promise<any> {
@@ -304,7 +348,7 @@ export default class Order {
 
       const { results, total } = await mysql
         .from(`${this.tableName} ord`)
-        .select("id, userName, operatorName, createdOn, modifyOn, durationSec, accuracyPercent")
+        .select("id, userName, operatorName, createdOn, modifyOn, durationSec, accuracyPercent,multiShip")
         .where(conditions.join(" AND "))
         .offset(offset)
         .limit(limit)
