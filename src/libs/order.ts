@@ -45,87 +45,94 @@ export default class Order {
         throw new Error("Invalid or empty data");
       }
 
-      // save the base64 image file stream to the bucket
-      const bobImage = await s3.putFileStream(
-        process.env["S3_BUCKET"] as string,
-        data.poDocument,
-        `${data.orderNumber}.png`
-      );
-
-      // if object
-      if (typeof bobImage === "object") {
-        // Parse checklist and determine if it has 'Ship To' label with MULTI-DESTINATIONS
-        let multiShip = null;
-        try {
-          const checklistArray: { label: string; value: string | string[] }[] = Array.isArray(data.checkList)
-            ? data.checkList
-            : JSON.parse(data.checkList);
-
-          const shipToEntry = checklistArray.find(
-            (item: { label: string; value: string | string[] }) =>
-              item.label === "Ship To" &&
-              typeof item.value === "string" &&
-              item.value.toLowerCase().includes("multi")
-          );
-
-          if (shipToEntry) {
-            multiShip = shipToEntry.value;
-          }
-        } catch (e) {
-          const err = e as Error;
-          logger(`[warn]: Error parsing checklist for Ship To – ${err.message}`);
-        }
-
-        // get row
-        const row: any = {
-          id: data.orderNumber,
-          travelerDocument: JSON.stringify(data.travelerDocument).replace(/'/g, "\\'").replace(/\\"/g, ""),
-          poOverlayBlocks: JSON.stringify(data.poOverlayBlocks).replace(/'/g, "\\'").replace(/\\"/g, ""),
-          checkList: JSON.stringify(data.checkList).replace(/'/g, "\\'").replace(/\\"/g, ""),
-          bizzRuleUrl: data.bizzRuleUrl,
-          userName: data.userName,
-          operatorName: data.operatorName,
-          allRects: JSON.stringify(data.allRects).replace(/'/g, "\\'").replace(/\\"/g, ""),
-          durationSec: data.durationSec || 0,
-          result: JSON.stringify(data.result).replace(/'/g, "\\'").replace(/\\"/g, ""),
-          // listToUse: JSON.stringify(data.listToUse).replace(/'/g, "\\'").replace(/\\"/g, ""),
-          // listToUse: listToUseJson,
-          // accuracyPercent: accuracy,
-          multiShip: multiShip,
-          foundFalse: data.foundFalse,
-          foundTrue: data.foundTrue,
-        };
-
-        // get orders
-        const orders = await mysql.table(this.tableName).exists(row.id);
-
-        // if order exists and order_id present
-        if (!orders.exists && row.id) {
-          // update order
-          await mysql
-            .into(this.tableName)
-            .fields(Object.keys(row))
-            .values(Object.values(row))
-            .insert();
-        } else {
-          // create order
-          await mysql
-            .table(this.tableName)
-            .fields(Object.keys(row))
-            .values(Object.values(row))
-            .where(`id = '${row.id}'`)
-            .update();
-        }
-
-        // response json data
-        return { message: "Order updated successfully.", status: "success" };
-      } else {
-        // on error
-        logger(`[error]: Unable to store in s3`);
-
-        // response json data
-        return { message: "Unable to store in s3", status: "error" };
+      // if po document exists
+      if (data.poDocument.trim() !== "") {
+        // save the base64 image file stream to the bucket
+        const bobImage = await s3.putFileStream(
+          process.env["S3_BUCKET"] as string,
+          data.poDocument,
+          `${data.orderNumber}.png`
+        );
       }
+
+      // Parse checklist and determine if it has 'Ship To' label with MULTI-DESTINATIONS
+      let multiShip = null;
+      try {
+        const checklistArray: { label: string; value: string | string[] }[] = Array.isArray(data.checkList)
+          ? data.checkList
+          : JSON.parse(data.checkList);
+
+        const shipToEntry = checklistArray.find(
+          (item: { label: string; value: string | string[] }) =>
+            item.label === "Ship To" &&
+            typeof item.value === "string" &&
+            item.value.toLowerCase().includes("multi")
+        );
+
+        if (shipToEntry) {
+          multiShip = shipToEntry.value;
+        }
+      } catch (e) {
+        const err = e as Error;
+        logger(`[warn]: Error parsing checklist for Ship To – ${err.message}`);
+      }
+
+      // get row
+      const row: any = {
+        id: data.orderNumber,
+        travelerDocument: JSON.stringify(data.travelerDocument).replace(/'/g, "\\'").replace(/\\"/g, ""),
+        // poOverlayBlocks: JSON.stringify(data.poOverlayBlocks).replace(/'/g, "\\'").replace(/\\"/g, "").replace(/\n\n/g, ""),
+        poOverlayBlocks: JSON.stringify(data.poOverlayBlocks.map((b: any) => ({ ...b, text: typeof b.text === "string" ? b.text.replace(/\n\n/g, " ").replace(/\n/g, "<br>").replace(/'/g, "\\'").replace(/\\"/g, "") : b.text }))),
+        xmlElement: data.xmlElementBase64,
+        checkList: JSON.stringify(data.checkList).replace(/'/g, "\\'").replace(/\\"/g, ""),
+        bizzRuleUrl: data.bizzRuleUrl,
+        userName: data.userName,
+        operatorName: data.operatorName,
+        allRects: JSON.stringify(data.allRects).replace(/'/g, "\\'").replace(/\\"/g, ""),
+        durationSec: data.durationSec || 0,
+        result: JSON.stringify(data.result).replace(/'/g, "\\'").replace(/\\"/g, ""),
+        // listToUse: JSON.stringify(data.listToUse).replace(/'/g, "\\'").replace(/\\"/g, ""),
+        // listToUse: listToUseJson,
+        // accuracyPercent: accuracy,
+        multiShip: multiShip,
+        foundTrue: data.foundTrue,
+        foundFalse: data.foundFalse,
+      };
+      // console.log(data);
+
+      // get orders
+      const orders = await mysql.table(this.tableName).exists(row.id);
+
+      // if order exists and order_id present
+      if (!orders.exists && row.id) {
+        // console.log(
+        //   `INSERT INTO ${this.tableName} (${Object.keys(row).join(", ")}) VALUES (${Object.values(row).map(val => `'${val}'`).join(", ")})`
+        // );
+
+        // update order
+        await mysql
+          .into(this.tableName)
+          .fields(Object.keys(row))
+          .values(Object.values(row))
+          .insert();
+      } else {
+        // const setClause = Object.entries(row)
+        //   .map(([key, val]) => `${key} = '${val}'`)
+        //   .join(", ");
+
+        // console.log(`UPDATE ${this.tableName} SET ${setClause} WHERE id = '${row.id}'`);
+
+        // create order
+        await mysql
+          .table(this.tableName)
+          .fields(Object.keys(row))
+          .values(Object.values(row))
+          .where(`id = '${row.id}'`)
+          .update();
+      }
+
+      // response json data
+      return { message: "Order updated successfully.", status: "success" };
     } catch (e: any) {
       // on error
       logger(`[error]: ${e.message}`);
@@ -219,88 +226,47 @@ export default class Order {
     }
   }
 
-  // async upsertOrder(data: any): Promise<any> {
-  //   try {
-  //     // 1) get a JS Date
-  //     const now = new Date();
-  //     // 2) format it for MySQL
-  //     const formattedNow =
-  //       now.toISOString().slice(0, 19).replace("T", " ");
-  //     console.log(formattedNow);
+  async upsertOrder(data: any): Promise<any> {
+    try {
+      // get a JS Date
+      const now = new Date();
+      // format it for MySQL
+      const formattedNow =
+        now.toISOString().slice(0, 19).replace("T", " ");
+      // console.log(formattedNow);
 
-  //     // Build your row (here only id + modifyOn)
-  //     const row: any = {
-  //       id: data.orderNumber,
-  //       modifyOn: formattedNow
-  //     };
+      // Build your row (here only id, modifyOn)
+      const row: any = {
+        id: data.orderNumber,
+        modifyOn: formattedNow
+      };
 
-  //     const fields = Object.keys(row);
-  //     const values = Object.values(row);
-  //     const existing = await mysql.table(this.tableName).exists(data.orderNumber);
+      const fields = Object.keys(row);
+      const values = Object.values(row);
+      const existing = await mysql.table(this.tableName).exists(data.orderNumber);
 
-  //     if (!existing.exists) {
-  //       await mysql
-  //         .into(this.tableName)
-  //         .fields(fields)
-  //         .values(values)
-  //         .insert();
-  //     } else {
-  //       // 3) use parameter binding in the WHERE clause too
-  //       await mysql
-  //         .table(this.tableName)
-  //         .fields(fields)
-  //         .values(values)
-  //         .where(`id = '${data.orderNumber}'`)
-  //         .update();
-  //     }
+      if (!existing.exists) {
+        await mysql
+          .into(this.tableName)
+          .fields(fields)
+          .values(values)
+          .insert();
+      } else {
+        //use parameter binding in the WHERE clause too
+        await mysql
+          .table(this.tableName)
+          .fields(fields)
+          .values(values)
+          .where(`id = '${data.orderNumber}'`)
+          .update();
+      }
 
-  //     return { message: "Order upserted successfully.", status: "success" };
-  //   } catch (err: any) {
-  //     console.error("Upsert error:", err.message);
-  //     return { message: err.message, status: "error" };
-  //   }
-  // }
-    async upsertOrder(data: any): Promise<any> {
-  try {
-    // 1) get a JS Date
-    const now = new Date();
-    // 2) format it for MySQL
-    const formattedNow =
-      now.toISOString().slice(0, 19).replace("T", " "); 
-      console.log(formattedNow);
-
-    // Build your row (here only id + modifyOn)
-    const row: any = {
-      id: data.orderNumber,
-      modifyOn: formattedNow
-    };
-
-    const fields = Object.keys(row);
-    const values = Object.values(row);
-    const existing = await mysql.table(this.tableName).exists(data.orderNumber);
-
-    if (!existing.exists) {
-      await mysql
-        .into(this.tableName)
-        .fields(fields)
-        .values(values)
-        .insert();
-    } else {
-      // 3) use parameter binding in the WHERE clause too
-      await mysql
-        .table(this.tableName)
-        .fields(fields)
-        .values(values)
-        .where(`id = '${data.orderNumber}'`)
-        .update();
+      return { message: "Order upserted successfully.", status: "success" };
+    } catch (err: any) {
+      // console.error("Upsert error:", err.message);
+      return { message: err.message, status: "error" };
     }
-
-    return { message: "Order upserted successfully.", status: "success" };
-  } catch (err: any) {
-    console.error("Upsert error:", err.message);
-    return { message: err.message, status: "error" };
   }
-}
 
   // search data
   async search(options: any): Promise<any> {
@@ -370,49 +336,6 @@ export default class Order {
     }
   }
 
-  // async reportData(options: any): Promise<any> {
-  //   const conditions: string[] = [];
-
-  //   try {
-  //     // Apply dynamic filters
-  //     if (typeof options.struct !== "undefined") {
-  //       createCondition(conditions, options, options.struct.toString());
-  //     }
-
-  //     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-  //     // === Report 1: Count of completed orders per operatorName ===
-  //     const { result, total } = await mysql
-  //       .table(this.tableName)
-  //       .select("*")
-  //       .where(`id = '${id}'`)
-  //       .many();
-
-  //     // === Report 2: Count of completed orders per day (createdOn) ===
-  //     const byDate = await mysql.query(
-  //       `SELECT DATE(ord.createdOn) AS orderDate, COUNT(*) AS orderCount
-  //      FROM ${this.tableName} ord
-  //      ${whereClause}
-  //      GROUP BY DATE(ord.createdOn)
-  //      ORDER BY orderDate ASC`
-  //     );
-
-  //     return {
-  //       status: "success",
-  //       data: {
-  //         byOperator,
-  //         byDate
-  //       }
-  //     };
-  //   } catch (error: any) {
-  //     logger(`[error]: ${error.message}`);
-  //     return {
-  //       status: "error",
-  //       message: error.message
-  //     };
-  //   }
-  // }
-
   // download data as Excel
   async download(options: any): Promise<any> {
     try {
@@ -462,7 +385,6 @@ export default class Order {
         .limit(limit) // Limit the number of rows
         .sort(order_by[0], order_by[1]) // Sort by requested column and order
         .many(); // Fetch many results
-      // console.log(total);
 
       // 7. If no records found, return early
       if (!results || results.length === 0) {
@@ -546,7 +468,7 @@ export default class Order {
 
           // return data
           return {
-            result: { ...result, poDocument: fileStream },
+            result: { ...result, poDocument: fileStream !== "The specified key does not exist." ? fileStream : "" },
             total: total,
             status: "success"
           };

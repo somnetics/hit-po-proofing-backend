@@ -19,14 +19,6 @@ router.post("/save", async (req: Request, res: Response) => {
   res.json(response);
 });
 
-// router.get("/report-data", async (req: Request, res: Response) => {
-//   // save order data
-//   const response = await order.reportData(req.query);
-
-//   // return json response
-//   res.json(response);
-// });
-
 router.post("/checkbox-toggle-all", async (req: Request, res: Response) => {
   // checkboxToggleAll order data
   const response = await order.checkboxToggleAll(req.body);
