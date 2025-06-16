@@ -395,7 +395,7 @@ export default class MySQL {
           // get rows
           const [rows]: any = await this.conn.query(query);
 
-          // // get record count
+          // get record count
           const count = await this.table(this.tableNames)
             .where(condition)
             .count();
@@ -448,8 +448,8 @@ export default class MySQL {
           const [rows]: any = await this.conn.query(query);
 
           // resolve with data
-          resolve({
-            total: 1,
+          resolve({            
+            total: rows.length,
             results: rows,
             query: query,
           });
