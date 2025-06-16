@@ -225,47 +225,14 @@ router.get("/summary", async (req: Request, res: Response) => {
       Man: manData
     };
 
-    // // Initialize structure like ordersIssuesData
-    // const foundStats: any = {
-    //   FoundTrue: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    //   FoundFalse: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    // };
-
-    // // Populate index
-    // foundData.results.forEach((row: any) => {
-    //   foundStats.FoundTrue[row.mnt - 1] = Number(row.foundTrue) || 0;
-    //   foundStats.FoundFalse[row.mnt - 1] = Number(row.foundFalse) || 0;
-    // });
-
     // get operators
     const operators = await mysql.raw(`SELECT operatorName FROM orders WHERE TRIM(operatorName) != '' GROUP BY operatorName`);
 
     // get total orders
     const operatorOrders = await mysql.raw(`SELECT COUNT(id) AS cnt, operatorName FROM orders WHERE TRIM(operatorName) != '' GROUP BY operatorName`);
 
-    // const operatorProductivity: any = {};
-
-    // operators.results.forEach((operator: any) => {
-    //   operatorProductivity[operator.operatorName] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    // });
-
-    //   results: [
-    //   { cnt: 60, mnt: 3, operatorName: 'Admin' },
-    //   { cnt: 4, mnt: 3, operatorName: 'Souvik Saha' },
-    //   { cnt: 3, mnt: 3, operatorName: 'Debraj' },
-    //   { cnt: 1, mnt: 3, operatorName: 'Sayan' },
-    //   { cnt: 1, mnt: 3, operatorName: 'Tapas Pradhan' },
-    //   { cnt: 1, mnt: 3, operatorName: 'Barsha Barik' },
-    //   { cnt: 26, mnt: 4, operatorName: 'Admin' },
-    //   { cnt: 11, mnt: 4, operatorName: 'Souvik Saha' },
-    //   { cnt: 17, mnt: 4, operatorName: 'Barsha Barik' },
-    //   { cnt: 14, mnt: 5, operatorName: 'Admin' },
-    //   { cnt: 51, mnt: 5, operatorName: 'Souvik Saha' },
-    //   { cnt: 11, mnt: 5, operatorName: 'Tapas Pradhan' }
-    // ],
-
     // console.log(operatorOrders);
-    console.log(operators.results.map((operator: any) => operator.operatorName));
+    // console.log(operators.results.map((operator: any) => operator.operatorName));
 
     // response json data
     res.json({

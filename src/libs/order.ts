@@ -12,7 +12,6 @@ const mysql = new MySQL();
 
 // import required modules
 import S3, { s3Options } from "./s3";
-import { log } from "console";
 
 // s3 optionjs
 const options: s3Options = {
@@ -83,7 +82,7 @@ export default class Order {
         travelerDocument: JSON.stringify(data.travelerDocument).replace(/'/g, "\\'").replace(/\\"/g, ""),
         // poOverlayBlocks: JSON.stringify(data.poOverlayBlocks).replace(/'/g, "\\'").replace(/\\"/g, "").replace(/\n\n/g, ""),
         poOverlayBlocks: JSON.stringify(data.poOverlayBlocks.map((b: any) => ({ ...b, text: typeof b.text === "string" ? b.text.replace(/\n\n/g, " ").replace(/\n/g, "<br>").replace(/'/g, "\\'").replace(/\\"/g, "") : b.text }))),
-        xmlElement: data.xmlElementBase64,
+        xmlElement: data.xmlElementBase64.trim() !== "" ? data.xmlElementBase64.trim() : 'NULL',
         checkList: JSON.stringify(data.checkList).replace(/'/g, "\\'").replace(/\\"/g, ""),
         bizzRuleUrl: data.bizzRuleUrl,
         userName: data.userName,

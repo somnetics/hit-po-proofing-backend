@@ -38,8 +38,7 @@ router.post("/checkbox-modified-time", async (req: Request, res: Response) => {
 // define search route
 router.get("/search", async (req: Request, res: Response) => {
   try {
-    // search forms
-    // console.log(req.query);
+    // search forms    
     const { results, total, message, status } = await order.search(req.query);
 
     // response json data
