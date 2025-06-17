@@ -8,13 +8,10 @@ import {
   ResultSetHeader,
 } from "mysql2";
 
-import mysql, { Connection } from 'mysql2/promise';
-
 // export mysql class
 export default class MySQL {
   // define properties
   db: Pool;
-  conn!: Connection;
   tableNames: string;
   fieldNames: string | string[];
   fieldValues: any[];
@@ -34,8 +31,10 @@ export default class MySQL {
       password: process.env["MYSQL_PASS"] as string,
       database: process.env["MYSQL_DB"] as string,
       waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0
+      connectionLimit: 100,
+      queueLimit: 0,
+      keepAliveInitialDelay: 10000, // 0 by default.
+      enableKeepAlive: true, // false by default.
     });
 
     // set default table names
@@ -61,19 +60,6 @@ export default class MySQL {
 
     // set default order
     this.order = "";
-
-    // connect to database
-    this.connect();
-  }
-
-  async connect() {
-    this.conn = await mysql.createConnection({
-      host: process.env["MYSQL_HOST"] as string,
-      port: Number(process.env["MYSQL_PORT"]),
-      user: process.env["MYSQL_USER"] as string,
-      password: process.env["MYSQL_PASS"] as string,
-      database: process.env["MYSQL_DB"] as string,
-    });
   }
 
   // init properties
@@ -119,78 +105,139 @@ export default class MySQL {
   // describe table
   describe() {
     // return promise
-    return new Promise<{ results: any; query: string }>(
-      async (resolve, reject) => {
-        try {
-          // set query
-          const query = `DESCRIBE ${this.tableNames}`;
+    return new Promise<{ results: any; query: string }>((resolve, reject) => {
+      // get connection pool
+      this.db.getConnection(
+        (err: NodeJS.ErrnoException | null, connection: PoolConnection) => {
+          // if error
+          if (err) {
+            // reject with err
+            reject(err);
+          } else {
+            // set query
+            const query = `DESCRIBE ${this.tableNames}`;
 
-          // get rows
-          const [rows]: any = await this.conn.query(query);
+            // prepare statement
+            connection.query(
+              query,
+              async (err: QueryError | null, rows: RowDataPacket) => {
+                // close the connection to pool
+                connection.destroy();
 
-          // resolve with data
-          resolve({
-            results: rows,
-            query: query,
-          });
-        } catch (e) {
-          // reject with err
-          reject(e);
+                // if error
+                if (err) {
+                  // show query
+                  console.log(query);
+
+                  // reject with err
+                  reject(err);
+                } else {
+                  resolve({
+                    results: JSON.parse(JSON.stringify(rows)).map(
+                      (row: any) => row
+                    ),
+                    query: query,
+                  });
+                }
+              }
+            );
+          }
         }
-      }
-    );
+      );
+    });
   }
 
   // if exists
   exists(id: string) {
     // return promise
-    return new Promise<{ exists: boolean; result: any }>(
-      async (resolve, reject) => {
-        try {
-          // set query
-          const query = `SELECT * FROM ${this.tableNames} WHERE id = '${id}'`;
+    return new Promise<{ exists: boolean; result: any }>((resolve, reject) => {
+      // get connection pool
+      this.db.getConnection(
+        (err: NodeJS.ErrnoException | null, connection: PoolConnection) => {
+          // if error
+          if (err) {
+            // reject with err
+            reject(err);
+          } else {
+            // set query
+            const query = `SELECT * FROM ${this.tableNames} WHERE id = '${id}'`;
 
-          // get rows
-          const [rows]: any = await this.conn.query(query);
+            // prepare statement
+            connection.query(
+              query,
+              // (err: QueryError | null, rows: RowDataPacket) => {
+              (err: QueryError | null, rows: any) => {
+                // close the connection to pool
+                connection.destroy();
 
-          // resolve with data
-          resolve({
-            exists: rows.length ? true : false,
-            result: rows.length ? rows[0] : [],
-          });
-        } catch (e) {
-          // reject with err
-          reject(e);
+                // if error
+                if (err) {
+                  // show query
+                  console.log(query);
+
+                  // reject with err
+                  reject(err);
+                } else {
+                  // resolve with data
+                  resolve({
+                    exists: rows.length ? true : false,
+                    result: rows.length ? rows[0] : [],
+                  });
+                }
+              }
+            );
+          }
         }
-      }
-    );
+      );
+    });
   }
 
   // insert record
   insert() {
     // return promise
     return new Promise<{ result: ResultSetHeader; query: string }>(
-      async (resolve, reject) => {
-        try {
-          // set query
-          const query =
-            `INSERT INTO ${this.tableNames} (${this.fieldNames}) VALUES ('${this.fieldValues.join("', '")}')`.replace(
-              /'NULL'/g,
-              "NULL"
-            );
+      (resolve, reject) => {
+        // get connection pool
+        this.db.getConnection(
+          (err: NodeJS.ErrnoException | null, connection: PoolConnection) => {
+            // if error
+            if (err) {
+              // reject with err
+              reject(err);
+            } else {
+              // set query
+              const query =
+                `INSERT INTO ${this.tableNames} (${this.fieldNames}) VALUES ('${this.fieldValues.join("', '")}')`.replace(
+                  /'NULL'/g,
+                  "NULL"
+                );
 
-          // get rows
-          const [rows]: any = await this.conn.query(query);
+              // prepare statement
+              connection.query(
+                query,
+                (err: QueryError | null, result: ResultSetHeader) => {
+                  // close the connection to pool
+                  connection.destroy();
 
-          // resolve with data
-          resolve({
-            result: rows,
-            query: query,
-          });
-        } catch (e) {
-          // reject with err
-          reject(e);
-        }
+                  // if error
+                  if (err) {
+                    // show query
+                    console.log(query);
+
+                    // reject with err
+                    reject(err);
+                  } else {
+                    // resolve with data
+                    resolve({
+                      result: result,
+                      query: query,
+                    });
+                  }
+                }
+              );
+            }
+          }
+        );
       }
     );
   }
@@ -215,21 +262,44 @@ export default class MySQL {
 
     // return promise
     return new Promise<{ result: ResultSetHeader; query: string }>(
-      async (resolve, reject) => {
-        try {
-          // set query
-          const query = `UPDATE ${this.tableNames} SET ${fliedValuePair.join(", ")} WHERE ${this.condition || 1}`;
-          // get rows
-          const [rows]: any = await this.conn.query(query);
-          // resolve with data
-          resolve({
-            result: rows,
-            query: query,
-          });
-        } catch (e) {
-          // reject with err
-          reject(e);
-        }
+      (resolve, reject) => {
+        // get connection pool
+        this.db.getConnection(
+          (err: NodeJS.ErrnoException | null, connection: PoolConnection) => {
+            // if error
+            if (err) {
+              // reject with err
+              reject(err);
+            } else {
+              // set query
+              const query = `UPDATE ${this.tableNames} SET ${fliedValuePair.join(", ")} WHERE ${this.condition || 1}`;
+
+              // prepare statement
+              connection.query(
+                query,
+                (err: QueryError | null, result: ResultSetHeader) => {
+                  // close the connection to pool
+                  connection.destroy();
+
+                  // if error
+                  if (err) {
+                    // show query
+                    console.log(query);
+
+                    // reject with err
+                    reject(err);
+                  } else {
+                    // resolve with data
+                    resolve({
+                      result: result,
+                      query: query,
+                    });
+                  }
+                }
+              );
+            }
+          }
+        );
       }
     );
   }
@@ -332,50 +402,87 @@ export default class MySQL {
   // count
   count() {
     // return promise
-    return new Promise<number>(
-      async (resolve, reject) => {
-        try {
-          // set query
-          const query = `SELECT COUNT(*) as cnt FROM ${this.tableNames} WHERE ${this.condition || 1}`;
+    return new Promise<number>((resolve, reject) => {
+      // get connection pool
+      this.db.getConnection(
+        (err: NodeJS.ErrnoException | null, connection: PoolConnection) => {
+          // if error
+          if (err) {
+            // reject with err
+            reject(err);
+          } else {
+            // set query
+            const query = `SELECT COUNT(*) as cnt FROM ${this.tableNames} WHERE ${this.condition || 1}`;
 
-          // get rows
-          const [rows]: any = await this.conn.query(query);
+            // prepare statement
+            connection.query(
+              query,
+              (err: QueryError | null, rows: RowDataPacket) => {
+                // close the connection to pool
+                connection.destroy();
 
-          // resolve with data
-          resolve(rows[0].cnt);
-        } catch (e) {
-          // reject with err
-          reject(e);
+                // if error
+                if (err) {
+                  // show query
+                  console.log(query);
+
+                  // reject with err
+                  reject(err);
+                } else {
+                  // resolve with data
+                  resolve(Number(rows[0].cnt));
+                }
+              }
+            );
+          }
         }
-      }
-    );
+      );
+    });
   }
 
   // find one
   one() {
     // return promise
     return new Promise<{ total: number; result: any; query: string }>(
-      async (resolve, reject) => {
-        try {
-          // store condition
-          const condition = this.condition;
+      (resolve, reject) => {
+        // get connection pool
+        this.db.getConnection(
+          (err: NodeJS.ErrnoException | null, connection: PoolConnection) => {
+            // if error
+            if (err) {
+              // reject with err
+              reject(err);
+            } else {
+              // set query
+              const query = `SELECT ${this.fieldNames ? this.fieldNames : "*"} FROM ${this.tableNames} WHERE ${this.condition || 1} ${this.key ? `ORDER BY ${this.key} ${this.order || ""}` : ""} LIMIT 1`;
 
-          // set query
-          const query = `SELECT ${this.fieldNames ? this.fieldNames : "*"} FROM ${this.tableNames} WHERE ${condition || 1} ${this.key ? `ORDER BY ${this.key} ${this.order || ""}` : ""} LIMIT ${this.limitValue} OFFSET ${(this.offsetValue - 1) * this.limitValue}`;
+              // prepare statement
+              connection.query(
+                query,
+                (err: QueryError | null, rows: RowDataPacket) => {
+                  // close the connection to pool
+                  connection.destroy();
 
-          // get rows
-          const [rows]: any = await this.conn.query(query);
+                  // if error
+                  if (err) {
+                    // show query
+                    console.log(query);
 
-          // resolve with data
-          resolve({
-            total: rows.length,
-            result: rows.length > 0 ? rows[0] : {},
-            query: query,
-          });
-        } catch (e) {
-          // reject with err
-          reject(e);
-        }
+                    // reject with err
+                    reject(err);
+                  } else {
+                    // resolve with data
+                    resolve({
+                      total: Number(rows["length"]),
+                      result: JSON.parse(JSON.stringify(rows[0] || {})),
+                      query: query,
+                    });
+                  }
+                }
+              );
+            }
+          }
+        );
       }
     );
   }
@@ -384,32 +491,55 @@ export default class MySQL {
   many() {
     // return promise
     return new Promise<{ total: number; results: any; query: string }>(
-      async (resolve, reject) => {
-        try {
-          // store condition
-          const condition = this.condition;
+      (resolve, reject) => {
+        // get connection pool
+        this.db.getConnection(
+          (err: NodeJS.ErrnoException | null, connection: PoolConnection) => {
+            // if error
+            if (err) {
+              // reject with err
+              reject(err);
+            } else {
+              // store condition
+              const condition = this.condition;
 
-          // set query
-          const query = `SELECT ${this.fieldNames ? this.fieldNames : "*"} FROM ${this.tableNames} WHERE ${condition || 1} ${this.key ? `ORDER BY ${this.key} ${this.order || ""}` : ""} LIMIT ${this.limitValue} OFFSET ${(this.offsetValue - 1) * this.limitValue}`;
+              // set query
+              const query = `SELECT ${this.fieldNames ? this.fieldNames : "*"} FROM ${this.tableNames} WHERE ${condition || 1} ${this.key ? `ORDER BY ${this.key} ${this.order || ""}` : ""} LIMIT ${this.limitValue} OFFSET ${(this.offsetValue - 1) * this.limitValue}`;
 
-          // get rows
-          const [rows]: any = await this.conn.query(query);
+              // prepare statement
+              connection.query(
+                query,
+                async (err: QueryError | null, rows: RowDataPacket) => {
+                  // close the connection to pool
+                  connection.destroy();
 
-          // get record count
-          const count = await this.table(this.tableNames)
-            .where(condition)
-            .count();
+                  // if error
+                  if (err) {
+                    // show query
+                    console.log(query);
 
-          // resolve with data
-          resolve({
-            total: count,
-            results: rows,
-            query: query,
-          });
-        } catch (e) {
-          // reject with err
-          reject(e);
-        }
+                    // reject with err
+                    reject(err);
+                  } else {
+                    // get record count
+                    const count: number = await this.table(this.tableNames)
+                      .where(condition)
+                      .count();
+
+                    // resolve with data
+                    resolve({
+                      total: count,
+                      results: JSON.parse(JSON.stringify(rows)).map(
+                        (row: any) => row
+                      ),
+                      query: query,
+                    });
+                  }
+                }
+              );
+            }
+          }
+        );
       }
     );
   }
@@ -417,47 +547,81 @@ export default class MySQL {
   // delete record
   delete() {
     // return promise
-    return new Promise<{ query: string }>(
-      async (resolve, reject) => {
-        try {
-          // set query
-          const query = `DELETE FROM ${this.tableNames} WHERE ${this.condition || 1}`;
+    return new Promise<{ query: string }>((resolve, reject) => {
+      // get connection pool
+      this.db.getConnection(
+        (err: NodeJS.ErrnoException | null, connection: PoolConnection) => {
+          // if error
+          if (err) {
+            // reject with err
+            reject(err);
+          } else {
+            // set query
+            const query = `DELETE FROM ${this.tableNames} WHERE ${this.condition || 1}`;
 
-          // get rows
-          await this.conn.query(query);
+            // prepare statement
+            connection.query(query, (err: QueryError | null) => {
+              // close the connection to pool
+              connection.destroy();
 
-          // resolve with data
-          resolve({
-            query: query,
-          });
-        } catch (e) {
-          // reject with err
-          reject(e);
+              // if error
+              if (err) {
+                // show query
+                console.log(query);
+
+                // reject with err
+                reject(err);
+              } else {
+                // resolve with data
+                resolve({ query: query });
+              }
+            });
+          }
         }
-      }
-    );
+      );
+    });
   }
 
   // raw query
   raw(query: string) {
     // return promise
-    return new Promise<{ total: number; results: any; query: string }>(
-      async (resolve, reject) => {
-        try {
-          // get rows
-          const [rows]: any = await this.conn.query(query);
+    return new Promise<{ total: number; results: any; query: string }>((resolve, reject) => {
+      // get connection pool
+      this.db.getConnection(
+        (err: NodeJS.ErrnoException | null, connection: PoolConnection) => {
+          // if error
+          if (err) {
+            // reject with err
+            reject(err);
+          } else {
+            // prepare statement
+            connection.query(
+              query,
+              async (err: QueryError | null, rows: RowDataPacket) => {
+                // close the connection to pool
+                connection.destroy();
 
-          // resolve with data
-          resolve({            
-            total: rows.length,
-            results: rows,
-            query: query,
-          });
-        } catch (e) {
-          // reject with err
-          reject(e);
+                // if error
+                if (err) {
+                  // show query
+                  console.log(query);
+
+                  // reject with err
+                  reject(err);
+                } else {
+                  resolve({
+                    total: Number(JSON.parse(JSON.stringify(rows)).length),
+                    results: JSON.parse(JSON.stringify(rows)).map(
+                      (row: any) => row
+                    ),
+                    query: query,
+                  });
+                }
+              }
+            );
+          }
         }
-      }
-    );
+      );
+    });
   }
 }

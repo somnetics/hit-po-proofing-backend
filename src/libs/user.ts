@@ -1,11 +1,5 @@
-// import logger
-import logger from "./logger";
-
-// import momment module
-import moment from "moment";
-
 // import function
-import { createCondition, properCase, randomKey, encrypt, decrypt } from "./functions";
+import { createCondition } from "./functions";
 
 // import mysql class
 import MySQL from "./mysql";
@@ -17,6 +11,7 @@ const mysql = new MySQL();
 export default class User {
   // define tablename
   tableName: string;
+  
   // class constructor
   constructor() {
     // set tablename

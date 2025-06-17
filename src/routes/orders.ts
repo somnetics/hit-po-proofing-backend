@@ -85,6 +85,17 @@ router.get("/download", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// fetch assignto and username
+router.get("/assigned-users", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const data = await order.getAssignedUsers();
+    res.status(200).json({ status: "success", data });
+  } catch (err: any) {
+    console.error("Error fetching assigned users:", err.message);
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
 type ResultBody = {
   [key: string]: unknown;
 }

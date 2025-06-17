@@ -1,15 +1,12 @@
 // import dotenv
 import dotenv from "dotenv";
-import cors from "cors";
-
-// import bodyParser
-// import { json, urlencoded } from 'body-parser';
+// import cors from "cors";
 
 // load .env config
 dotenv.config();
 
 // import express
-import express, { Express, Request, Response } from "express";
+import express, { Express } from "express";
 
 // get exporess app
 const app: Express = express();
@@ -24,17 +21,6 @@ app.use(
     extended: true
   })
 );
-
-app.use(cors({
-  origin: "*", 
-  methods: ["GET"],
-  exposedHeaders: ["Content-Disposition"]
-}));
-
-// Increase URL-encoded payload limit
-const bodyParser = require("body-parser");
-app.use(bodyParser.json({ limit: "50mb" }));
-app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 
 // url encode body-parser JSON
 app.use(express.json({ limit: "100mb" }));
@@ -86,7 +72,6 @@ import reports from "./routes/reports";
 
 // use order router module
 app.use("/reports", reports);
-
 
 // listen to server
 app.listen(port, "0.0.0.0", () => {

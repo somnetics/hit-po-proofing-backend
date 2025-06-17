@@ -226,13 +226,10 @@ router.get("/summary", async (req: Request, res: Response) => {
     };
 
     // get operators
-    const operators = await mysql.raw(`SELECT operatorName FROM orders WHERE TRIM(operatorName) != '' GROUP BY operatorName`);
+    const operators = await mysql.raw(`SELECT operatorName FROM orders WHERE TRIM(operatorName) != '' GROUP BY operatorName ORDER BY operatorName`);
 
     // get total orders
-    const operatorOrders = await mysql.raw(`SELECT COUNT(id) AS cnt, operatorName FROM orders WHERE TRIM(operatorName) != '' GROUP BY operatorName`);
-
-    // console.log(operatorOrders);
-    // console.log(operators.results.map((operator: any) => operator.operatorName));
+    const operatorOrders = await mysql.raw(`SELECT COUNT(id) AS cnt, operatorName FROM orders WHERE TRIM(operatorName) != '' GROUP BY operatorName ORDER BY cnt DESC`);
 
     // response json data
     res.json({
@@ -244,7 +241,7 @@ router.get("/summary", async (req: Request, res: Response) => {
       ordersIssues: ordersIssuesData,
       manMachineRatio: manMachineData,
       accuracy: '63%',
-      operatorOrders: operatorOrders.results.map((order: any) => order.cnt),      
+      operatorOrders: operatorOrders.results,      
       // repeatVisit: repeatVisit,
       // ageGroup: ageGroupData,
       // registeredPatients: registeredPatientsData,

@@ -446,6 +446,32 @@ export default class Order {
     }
   }
 
+    async getAssignedUsers() {
+    try {
+      // Fetch distinct user names from the current table
+      const { results: userNames } = await mysql
+        .from(`${this.tableName}`)
+        .select("DISTINCT userName")
+        .many();
+
+      // Fetch distinct full names from the 'operator' table
+      const { results: fullNames } = await mysql
+        .from(`operator`)
+        .select("DISTINCT fullName")
+        .many();
+
+      // Return the list of usernames and full names as arrays
+      return {
+        userNames: userNames.map((r: any) => r.userName),
+        fullNames: fullNames.map((r: any) => r.fullName)
+      };
+    } catch (err: any) {
+      // Log the error and throw a custom error message
+      console.error("DB error:", err.message);
+      throw new Error("Failed to fetch assigned users");
+    }
+  }
+
   // get data
   async get(id: string): Promise<any> {
     try {

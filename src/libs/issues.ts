@@ -16,13 +16,10 @@ import { createCondition, properCase } from "./functions";
 export default class issues {
   // set table name
   tableName: string;
-  // tableName2: string;
-  // there is another table name as operator
-
+  
   // on initiate
   constructor() {
-    this.tableName = "issue";
-    // this.tableName2 = "operator";
+    this.tableName = "issue";    
   }
 
   // save issues
