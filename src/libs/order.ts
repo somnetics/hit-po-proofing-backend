@@ -121,7 +121,9 @@ export default class Order {
 
         // console.log(`UPDATE ${this.tableName} SET ${setClause} WHERE id = '${row.id}'`);
 
-        // create order
+        delete row.operatorName;
+
+        // update order
         await mysql
           .table(this.tableName)
           .fields(Object.keys(row))
@@ -338,34 +340,65 @@ export default class Order {
   // download data as Excel
   async download(options: any): Promise<any> {
     try {
-      // 1. Extract pagination and sorting parameters from the request options
-      const offset = Number(options["page"]) || 1; // Default to page 1
-      const limit = Number(options["size"]) || 50; // Default to 50 items per page
-      const order_by = (options["order_by"]?.toString() || "isu.id:asc").split(":"); // Default sort by 'isu.id' ascending
-      const struct = options["struct"]?.toString(); // Optional filter structure
+      const order_by = (options["order_by"]?.toString() || "odr.id:asc").split(":");
+      const struct = options["struct"]?.toString();
 
-      // 2. Remove special keys so they don’t interfere with SQL filters
       delete options["page"];
       delete options["size"];
       delete options["order_by"];
       delete options["trash"];
       delete options["struct"];
 
-      // 3. Create an array of SQL WHERE conditions based on filters
-      const conditions: string[] =
-        typeof options["operatorName"] !== "undefined"
-          ? [`isu.operatorName LIKE '%${options["operatorName"]}%'`]
-          : [];
+      const conditions: string[] = [];
 
-      // 4. Add more conditions dynamically if struct is defined
+      // Exact match for operatorName
+      const operatorName = options["operatorName"];
+      if (typeof operatorName !== "undefined") {
+        if (Array.isArray(operatorName)) {
+          const values = operatorName.map((val) => `'${val}'`).join(", ");
+          conditions.push(`odr.operatorName IN (${values})`);
+        } else {
+          conditions.push(`odr.operatorName = '${operatorName}'`);
+        }
+      }
+
+      // Exact match for userName
+      const userName = options["userName"];
+      if (typeof userName !== "undefined") {
+        if (Array.isArray(userName)) {
+          const values = userName.map((val) => `'${val}'`).join(", ");
+          conditions.push(`odr.userName IN (${values})`);
+        } else {
+          conditions.push(`odr.userName = '${userName}'`);
+        }
+      }
+
+      // Optional struct filter logic
       if (typeof struct !== "undefined") {
         createCondition(conditions, options, struct);
       }
 
-      // 5. Define only the keys you want to include in the Excel export
+      // Handle date range filtering
+      const fromDateRaw = options["from"];
+      const toDate = options["to"];
+
+      let fromDate: string | undefined = undefined;
+      if (fromDateRaw) {
+        const previousDay = new Date(fromDateRaw);
+        previousDay.setDate(previousDay.getDate());
+        fromDate = previousDay.toISOString().split("T")[0];
+      }
+
+      if (fromDate && toDate) {
+        conditions.push(`DATE(odr.createdOn) BETWEEN '${fromDate}' AND '${toDate}'`);
+      } else if (fromDate) {
+        conditions.push(`DATE(odr.createdOn) >= '${fromDate}'`);
+      } else if (toDate) {
+        conditions.push(`DATE(odr.createdOn) <= '${toDate}'`);
+      }
+
       const allowedKeys = [
         "id",
-        // "travelerDocument", // Commented out: exclude this column
         "bizzRuleUrl",
         "userName",
         "operatorName",
@@ -375,17 +408,15 @@ export default class Order {
         "accuracyPercent",
       ];
 
-      // 6. Fetch filtered and sorted data from the MySQL database
       const { results, total } = await mysql
-        .select(allowedKeys.map((key) => `isu.${key}`)) // Only select allowed columns
-        .from(`${this.tableName} isu`) // Main table alias
-        .where(conditions.join(" AND ")) // Apply conditions as AND logic
-        .offset(offset) // Apply pagination offset
-        .limit(limit) // Limit the number of rows
-        .sort(order_by[0], order_by[1]) // Sort by requested column and order
-        .many(); // Fetch many results
+        .select(allowedKeys.map((key) => `odr.${key}`))
+        .from(`${this.tableName} odr`)
+        .where(conditions.join(" AND "))
+        .offset()
+        .limit()
+        .sort(order_by[0] as string, order_by[1] as string)
+        .many();
 
-      // 7. If no records found, return early
       if (!results || results.length === 0) {
         return {
           message: "No data found",
@@ -395,58 +426,59 @@ export default class Order {
         };
       }
 
-      // 8. Initialize ExcelJS workbook and worksheet
       const ExcelJS = require("exceljs");
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Orders");
 
-      // 9. Map column keys to friendly header names for the Excel sheet
       const headerMap: Record<string, string> = {
         id: "Po Number",
-        // travelerDocument: "Traveler Document", // Excluded field
         bizzRuleUrl: "BizzRule Url",
         userName: "UserName",
         operatorName: "Operator Name",
         createdOn: "Created On",
-        // modifyOn: "Modify On",
         accuracyPercent: "Accuracy(%)",
         durationSec: "Duration (sec)",
         modifyOn: "Complete Order"
       };
 
-      // 10. Define worksheet columns based on allowed keys and headerMap
       worksheet.columns = allowedKeys.map((key) => ({
-        header: headerMap[key], // Column name in Excel
-        key: key,               // Key used to map values
-        width: 20               // Column width
+        header: headerMap[key],
+        key: key,
+        width: 20
       }));
 
-      // 11. Add each row of result data into the worksheet
       results.forEach((row: any) => {
         const filteredRow: any = {};
         allowedKeys.forEach((key) => {
-          filteredRow[key] = row[key]; // Include only allowed fields
+          let value = row[key];
+
+          if (key === "createdOn" || key === "modifyOn") {
+            if (value) {
+              const date = new Date(value);
+              value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+            }
+          }
+
+          filteredRow[key] = value;
         });
-        worksheet.addRow(filteredRow); // Add filtered row to sheet
+        worksheet.addRow(filteredRow);
       });
 
-      // 12. Generate an Excel buffer (in-memory binary file)
       const buffer = await workbook.xlsx.writeBuffer();
 
-      // 13. Return the Excel file buffer with metadata
       return {
         buffer,
-        fileName: `Orders_${Date.now()}.xlsx`, // Dynamic filename
+        fileName: `Orders_${Date.now()}.xlsx`,
         status: "success"
       };
     } catch (err: any) {
-      // 14. Handle and log any unexpected errors
       console.error(err.message);
       return { message: err.message, status: "error", results: [], total: 0 };
     }
   }
 
-    async getAssignedUsers() {
+
+  async getAssignedUsers() {
     try {
       // Fetch distinct user names from the current table
       const { results: userNames } = await mysql

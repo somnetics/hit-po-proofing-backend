@@ -4,7 +4,7 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "dev": "nodemon --watch src --ext ts,js --exec ts-node ./src/main.ts",
+    "dev": "nodemon --watch src --ext ts,js --exec \"node --max-old-space-size=4096 -r ts-node/register ./src/main.ts\"",
     "build": "npm run clean && tsc --removeComments",
     "clean": "rimraf ./build",
     "start": "node ./build/main.js"

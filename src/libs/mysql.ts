@@ -16,8 +16,8 @@ export default class MySQL {
   fieldNames: string | string[];
   fieldValues: any[];
   condition: string;
-  offsetValue: number;
-  limitValue: number;
+  offsetValue: number | undefined;
+  limitValue: number | undefined;
   key: string;
   order: string;
 
@@ -364,18 +364,18 @@ export default class MySQL {
   }
 
   // set offset
-  offset(value: number) {
+  offset(value?: number) {
     // set offset
-    this.offsetValue = value || this.offsetValue;
+    this.offsetValue = value;
 
     // return this instance
     return this;
   }
 
   // set limit
-  limit(value: number) {
+  limit(value?: number) {
     // set limit
-    this.limitValue = value || this.limitValue;
+    this.limitValue = value;
 
     // return this instance
     return this;
@@ -503,8 +503,17 @@ export default class MySQL {
               // store condition
               const condition = this.condition;
 
-              // set query
-              const query = `SELECT ${this.fieldNames ? this.fieldNames : "*"} FROM ${this.tableNames} WHERE ${condition || 1} ${this.key ? `ORDER BY ${this.key} ${this.order || ""}` : ""} LIMIT ${this.limitValue} OFFSET ${(this.offsetValue - 1) * this.limitValue}`;
+              // let query
+              let query = "";
+
+              // on limit offset
+              if (typeof this.offsetValue !== "undefined" && typeof this.limitValue !== "undefined") {
+                // set query
+                query = `SELECT ${this.fieldNames ? this.fieldNames : "*"} FROM ${this.tableNames} WHERE ${condition || 1} ${this.key ? `ORDER BY ${this.key} ${this.order || ""}` : ""} LIMIT ${this.limitValue} OFFSET ${(this.offsetValue - 1) * this.limitValue}`;
+              } else {
+                // set query
+                query = `SELECT ${this.fieldNames ? this.fieldNames : "*"} FROM ${this.tableNames} WHERE ${condition || 1} ${this.key ? `ORDER BY ${this.key} ${this.order || ""}` : ""}`;
+              }
 
               // prepare statement
               connection.query(

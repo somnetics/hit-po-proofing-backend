@@ -16,10 +16,10 @@ import { createCondition, properCase } from "./functions";
 export default class issues {
   // set table name
   tableName: string;
-  
+
   // on initiate
   constructor() {
-    this.tableName = "issue";    
+    this.tableName = "issue";
   }
 
   // save issues
@@ -187,8 +187,8 @@ export default class issues {
 
     if (typeof struct.length) {
       const index = struct.findIndex((field: any) => field.name == "status");
-      
-      if(index > -1) {
+
+      if (index > -1) {
         struct[index].name = "color";
       }
     }
@@ -215,7 +215,7 @@ export default class issues {
     const conditions: string[] =
       typeof options["assignTo"] !== "undefined"
         ? [`isu.assignTo LIKE '%${options["assignTo"]}%'`]
-        : []; 
+        : [];
 
     try {
       // if struct is defined
@@ -280,9 +280,7 @@ export default class issues {
   async download(options: any): Promise<any> {
     try {
       // Extract pagination and sorting parameters
-      const offset = Number(options["page"]) || 1;
-      const limit = Number(options["size"]) || 50;
-      const order_by = (options["order_by"]?.toString() || "ord.id:asc").split(":");
+      const order_by = (options["order_by"]?.toString() || "isu.id:asc").split(":");
       const struct = options["struct"]?.toString();
 
       // Remove used keys to prevent them from affecting condition generation
@@ -293,16 +291,51 @@ export default class issues {
       delete options["struct"];
 
       // Build SQL WHERE conditions
-      const conditions: string[] =
-        typeof options["assignTo"] !== "undefined"
-          ? [`isu.assignTo LIKE '%${options["assignTo"]}%'`]
-          : [];
+      const conditions: string[] = [];
+      const assignTo = options["assignTo"];
+      if (typeof assignTo !== "undefined") {
+        if (Array.isArray(assignTo)) {
+          const values = assignTo.map((val) => `'${val}'`).join(", ");
+          conditions.push(`isu.assignTo IN (${values})`);
+        } else {
+          conditions.push(`isu.assignTo = '${assignTo}'`);
+        }
+      }
+
+      // Exact match for userName
+      const userName = options["userName"];
+      if (typeof userName !== "undefined") {
+        if (Array.isArray(userName)) {
+          const values = userName.map((val) => `'${val}'`).join(", ");
+          conditions.push(`isu.userName IN (${values})`);
+        } else {
+          conditions.push(`isu.userName = '${userName}'`);
+        }
+      }
 
       // Generate dynamic condition if struct is provided
       if (typeof struct !== "undefined") {
         createCondition(conditions, options, struct);
       }
 
+      // Add date range filtering
+      const fromDateRaw = options["from"];
+      const toDate = options["to"];
+
+      let fromDate: string | undefined = undefined;
+      if (fromDateRaw) {
+        const previousDay = new Date(fromDateRaw);
+        previousDay.setDate(previousDay.getDate());
+        fromDate = previousDay.toISOString().split("T")[0];
+      }
+
+      if (fromDate && toDate) {
+        conditions.push(`DATE(isu.dateOfProblem) BETWEEN '${fromDate}' AND '${toDate}'`);
+      } else if (fromDate) {
+        conditions.push(`DATE(isu.dateOfProblem) >= '${fromDate}'`);
+      } else if (toDate) {
+        conditions.push(`DATE(isu.dateOfProblem) <= '${toDate}'`);
+      }
       // Define allowed columns to be selected
       const allowedKeys = [
         "id",
@@ -324,8 +357,8 @@ export default class issues {
         .select(allowedKeys.map((key) => `isu.${key}`))
         .from(`${this.tableName} isu`)
         .where(conditions.join(" AND "))
-        .offset(offset)
-        .limit(limit)
+        .offset()
+        .limit()
         .sort(order_by[0] as string, order_by[1] as string)
         .many();
 
@@ -369,7 +402,20 @@ export default class issues {
 
       // Populate worksheet rows and apply coloring
       results.forEach((row: any) => {
+        // const excelRow = worksheet.addRow(row);
+        // Format specific date fields
+        if (row.dateOfProblem) {
+          const d = new Date(row.dateOfProblem);
+          row.dateOfProblem = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        }
+
+        if (row.shipDate) {
+          const s = new Date(row.shipDate);
+          row.shipDate = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}-${String(s.getDate()).padStart(2, "0")}`;
+        }
+
         const excelRow = worksheet.addRow(row);
+
 
         const rowColor = (row.color || "").toLowerCase();
         const remarksColor = (row.remarks_color || "").toLowerCase();
